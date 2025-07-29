@@ -6,21 +6,17 @@ import scipy as scp
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 
-class MSE:
+class Validator:
     def __init__ (self):
-        self.NULL_DATASET_ERROR = "[-] Error: One of the datasets is null"
-        self.TYPE_MISMATCH_ERROR = "[-] Error: Datasets don't have equal shapes"
+        self.NULL_DATASET_ERROR = "[-] Error: Either or both datasets is null"
+        self.UNEQUAL_SHAPE_ERROR = "[-] Error: Shapes of both datasets aren't equal"
 
-    def _validate_predictions (
-        self,
-        test_preds: Union[np.ndarray | pd.DataFrame],
-        model_preds: Union[np.ndarray | pd.DataFrame]   
-    ):
+    def validate (self, dataset: list[np.ndarray | pd.DataFrame]):
         try:
-            if test_preds is None or model_preds is None:
+            if any(dset == None for dset in dataset):
                 raise TypeError(self.NULL_DATASET_ERROR)
-            elif test_preds.shape != model_preds.shape:
-                raise ValueError(self.NULL_DATASET_ERROR)
+            elif dataset[0].shape != dataset[1].shape:
+                raise ValueError(self.UNEQUA_SHAPE_ERROR)
             else:
                 return True
         except TypeError as null_dataset_error:
@@ -30,17 +26,9 @@ class MSE:
             print(shape_mismatch_error)
             exit(EXIT_FAILURE)
 
-    def compute_loss (
-        self,
-        test_predictions: Union[np.ndarray | pd.DataFrame],
-        model_predictions: Union[np.ndarray | pd.DataFrame]
-    ):
-        if self._validate_predictions(test_predictions, model_predictions):
-            return np.mean(np.square(test_predictions - model_predictions))
-        
 class MSE:
     def __init__ (self):
-        pass
+        self.NULL_DATASET_ERROR = "[-] Error"
 
     def compute (
         self,
@@ -48,12 +36,17 @@ class MSE:
         model_preds: Union[np.ndarray | pd.DataFrame]
     ):
         try:
-            if test_preds != None and model_preds != None;
-                pass
-            else:
-                raise ValueError("[-] Error: Either one or both of the datasets is null")
-        except ValueError as null_dataset_error:
+            if any(prediction == None for prediction in [test_preds, model_preds]):
+                raise TypeError("[-] Error: Either one or both of the datasets is null")
+            if test_preds.shape != model_preds.shape:
+                raise ValueError("[-] Error: Shapes of both datasets don't match")
+
+            return 1 / float(len(test_preds)) * ((test_preds - model_preds) ** 2)
+        except TypeError as null_dataset_error:
             print(null_dataset_error)
+            exit(EXIT_FAILURE)
+        except ValueError as uneven_shape_error:
+            print(uneven_shape_error)
             exit(EXIT_FAILURE)
 
 class LinearRegression:
