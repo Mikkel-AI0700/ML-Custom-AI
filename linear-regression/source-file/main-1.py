@@ -28,34 +28,24 @@ class Validator:
 
 class MSE:
     def __init__ (self):
-        self.NULL_DATASET_ERROR = "[-] Error"
+        self.validator = Validator()
 
     def compute (
         self,
         test_preds: Union[np.ndarray | pd.DataFrame],
         model_preds: Union[np.ndarray | pd.DataFrame]
     ):
-        try:
-            if any(prediction == None for prediction in [test_preds, model_preds]):
-                raise TypeError("[-] Error: Either one or both of the datasets is null")
-            if test_preds.shape != model_preds.shape:
-                raise ValueError("[-] Error: Shapes of both datasets don't match")
-
-            return 1 / float(len(test_preds)) * ((test_preds - model_preds) ** 2)
-        except TypeError as null_dataset_error:
-            print(null_dataset_error)
-            exit(EXIT_FAILURE)
-        except ValueError as uneven_shape_error:
-            print(uneven_shape_error)
-            exit(EXIT_FAILURE)
+        if self.validator.validate([test_preds, model_preds]):
+            return 1 / len(test_preds) * ((test_preds - model_preds) ** 2)
 
 class LinearRegression:
-    def __init__(self, num_of_epochs: int, learning_rate: float, fit_intercept: bool = True):
+    def __init__(self, num_of_epochs: int = None, learning_rate: float = None, fit_intercept: bool = True):
         self.partial_dev_m = None
         self.partial_dev_b = None
         self.epochs = num_of_epochs
         self.learning_rate = learning_rate
-        self.fit_intercept = fit_intercept 
+        self.fit_intercept = fit_intercept
+        self.validator = Validator()
 
     def _compute_weights (self, train_x: np.ndarray, train_y: np.ndarray, predictions: np.ndarray):
         return -(2 / float(len(train_x))) * np.sum(train_x * (train_y - predictions))
@@ -74,22 +64,15 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
-        try:
-            if any(dataset == None for dataset in [train_x, train_y]):
-                raise ValueError("[-] Error: One or both the datasets is null")
-            if self.fit_intercept:
-                pass
-
+        if self.validator.validate([train_x, train_y]):
             for epoch in self.epochs:
-                print(f"[+] Epoch: {epoch + 1}")
-                predictions = self.partial_dev_m * train_x + self.partial_dev_b
-                weight_gradient = self._compute_weights(train_x, train_y, predictions)
-                bias_gradient = self._compute_bias(train_x, train_y, predictions)
-                self._update_weights_gradients(weight_gradient)
-                self._update_bias_gradients(bias_gradient)
-        except ValueError as null_dataset_error:
-            print(null_dataset_error)
-            exit(EXIT_FAILURE)
+                print(f"[+] Epoch: {epoch}")
+                weights_gradient = self._compute_weights()
+                bias_gradient = self._compute_bias()
+                self._update_weights_gradients()
+                self._update_bias_gradients()
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
-        return self.partial_dev_m * test_x + self.partial_dev_b
+        if self.validator.validate([test_x]):
+            return self.partial_dev_m * test_x + self.partial_dev_b
+
