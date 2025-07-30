@@ -74,7 +74,7 @@ class LinearRegression:
 
         if self.validator.validate([train_x, train_y]):
             for epoch in range(self.epochs):
-                print(f"[+] Epoch: {epoch}")
+                print(f"[+] Epoch: {epoch} | Partial Dev M: {self.partial_dev_m} | Partial Dev B: {self.partial_dev_b}\n")
                 predictions = self.partial_dev_m * train_x + self.partial_dev_b
                 weights_gradient = self._compute_weights(train_x, train_y, predictions)
                 bias_gradient = self._compute_bias(train_x, train_y, predictions)
