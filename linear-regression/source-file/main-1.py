@@ -69,6 +69,9 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
+        if self.fit_intercept:
+            train_x = np.hstack([np.ones(train_x.shape[0], 1), train_x])
+
         if self.validator.validate([train_x, train_y]):
             for epoch in range(self.epochs):
                 print(f"[+] Epoch: {epoch}")
