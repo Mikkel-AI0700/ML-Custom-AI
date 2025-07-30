@@ -16,7 +16,7 @@ class Validator:
             if any(dset == None for dset in dataset):
                 raise TypeError(self.NULL_DATASET_ERROR)
             elif dataset[0].shape != dataset[1].shape:
-                raise ValueError(self.UNEQUA_SHAPE_ERROR)
+                raise ValueError(self.UNEQUAL_SHAPE_ERROR)
             else:
                 return True
         except TypeError as null_dataset_error:
