@@ -6,6 +6,9 @@ import scipy as scp
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 
+# Setting the global random seed pseudo number
+np.random.seed(42)
+
 class Validator:
     def __init__ (self):
         self.NULL_DATASET_ERROR = "[-] Error: Either or both datasets is null"
@@ -15,10 +18,12 @@ class Validator:
         try:
             if any(dset == None for dset in dataset):
                 raise TypeError(self.NULL_DATASET_ERROR)
-            elif dataset[0].shape != dataset[1].shape:
-                raise ValueError(self.UNEQUAL_SHAPE_ERROR)
+            if len(dataset) == 2:
+                if dataset[0].shape[0] != dataset[1].shape[0]:
+                    raise ValueError(self.UNEQUAL_SHAPE_ERROR)
             else:
-                return True
+                pass
+            return True
         except TypeError as null_dataset_error:
             print(null_dataset_error)
             exit(EXIT_FAILURE)
@@ -36,12 +41,12 @@ class MeanSquaredError:
         model_preds: Union[np.ndarray | pd.DataFrame]
     ):
         if self.validator.validate([test_preds, model_preds]):
-            return 1 / len(test_preds) * ((test_preds - model_preds) ** 2)
+            return 1 / float(len(test_preds)) * np.mean((test_preds - model_preds) ** 2)
 
 class LinearRegression:
     def __init__(self, num_of_epochs: int = None, learning_rate: float = None, fit_intercept: bool = True):
-        self.partial_dev_m = None
-        self.partial_dev_b = None
+        self.partial_dev_m = np.random.rand()
+        self.partial_dev_b = np.random.rand() if fit_intercept else 0.0
         self.epochs = num_of_epochs
         self.learning_rate = learning_rate
         self.fit_intercept = fit_intercept
@@ -65,13 +70,13 @@ class LinearRegression:
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
         if self.validator.validate([train_x, train_y]):
-            for epoch in self.epochs:
+            for epoch in range(self.epochs):
                 print(f"[+] Epoch: {epoch}")
                 predictions = self.partial_dev_m * train_x + self.partial_dev_b
                 weights_gradient = self._compute_weights(train_x, train_y, predictions)
                 bias_gradient = self._compute_bias(train_x, train_y, predictions)
                 self._update_weights_gradients(weights_gradient)
-                self._update_bias_gradients(bias_gradients)
+                self._update_bias_gradients(bias_gradient)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
         if self.validator.validate([test_x]):
