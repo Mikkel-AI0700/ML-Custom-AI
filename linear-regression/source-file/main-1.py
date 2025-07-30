@@ -26,7 +26,7 @@ class Validator:
             print(shape_mismatch_error)
             exit(EXIT_FAILURE)
 
-class MSE:
+class MeanSquaredError:
     def __init__ (self):
         self.validator = Validator()
 
@@ -67,10 +67,11 @@ class LinearRegression:
         if self.validator.validate([train_x, train_y]):
             for epoch in self.epochs:
                 print(f"[+] Epoch: {epoch}")
-                weights_gradient = self._compute_weights()
-                bias_gradient = self._compute_bias()
-                self._update_weights_gradients()
-                self._update_bias_gradients()
+                predictions = self.partial_dev_m * train_x + self.partial_dev_b
+                weights_gradient = self._compute_weights(train_x, train_y, predictions)
+                bias_gradient = self._compute_bias(train_x, train_y, predictions)
+                self._update_weights_gradients(weights_gradient)
+                self._update_bias_gradients(bias_gradients)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
         if self.validator.validate([test_x]):
