@@ -55,18 +55,28 @@ class MeanSquaredError:
 
 class LinearRegression:
     def __init__(self, num_of_epochs: int = None, learning_rate: float = None, fit_intercept: bool = True):
-        self.partial_dev_m = np.random.rand()
-        self.partial_dev_b = np.random.rand() if fit_intercept else 0.0
+        self.partial_dev_m = None
+        self.partial_dev_b = None
         self.epochs = num_of_epochs
         self.learning_rate = learning_rate
         self.fit_intercept = fit_intercept
         self.validator = Validator()
 
+    def _initialize_partial_derivatives (self, train_x: np.ndarray):
+        # Initializing the partial derivative M while taking into account weight generation
+        if self.fit_intercept:
+            self.partial_dev_m = np.random.rand(train_x.shape[1])
+            return np.hstack([np.ones((train_x.shape[0], 1)), train_x])
+        else:
+            return np.hstack(np.ones([train_x.shape[0], 1], train_x))
+
+        self.partial_dev_b = np.random.rand() if self.fit_intercept else 0.0
+
     def _compute_weights (self, train_x: np.ndarray, train_y: np.ndarray, predictions: np.ndarray):
         return -(2 / float(len(train_x))) * np.sum(train_x * (train_y - predictions))
 
-    def _compute_bias (self, train_x: np.ndarray, train_y: np.ndarray, predictions: np.ndarray):
-        return -(2 / float(len(train_x))) * np.sum(train_y - predictions.flatten())
+    def _compute_bias (self, train_y: np.ndarray, predictions: np.ndarray):
+        return -(2 / float(len(train_y))) * np.sum(train_y - predictions)
 
     def _update_weights_gradients (self, computed_weight_gradient: Union[int | float]):
         self.partial_dev_m -= self.learning_rate * computed_weight_gradient
@@ -79,15 +89,14 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
-        if self.fit_intercept:
-            train_x = np.hstack([np.ones((train_x.shape[0], 1)), train_x])
+        train_x = self._initialize_partial_derivatives(train_x)
 
         if self.validator.validate([train_x, train_y]):
             for epoch in range(self.epochs):
                 print(f"[+] Epoch: {epoch} | Partial Dev M: {self.partial_dev_m} | Partial Dev B: {self.partial_dev_b}\n")
-                predictions = self.partial_dev_m * train_x + self.partial_dev_b
+                predictions = np.dot(train_x, self.partial_dev_m) + self.partial_dev_b
                 weights_gradient = self._compute_weights(train_x, train_y, predictions)
-                bias_gradient = self._compute_bias(train_x, train_y, predictions)
+                bias_gradient = self._compute_bias(train_y, predictions)
                 self._update_weights_gradients(weights_gradient)
                 self._update_bias_gradients(bias_gradient)
 
