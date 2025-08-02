@@ -25,18 +25,20 @@ class Validator:
         self.NULL_DATASET_ERROR = "[-] Error: Either or both datasets is null"
         self.UNEQUAL_SHAPE_ERROR = "[-] Error: Shapes of both datasets aren't equal"
 
-    def validate (self, dataset: list[np.ndarray | pd.DataFrame]):
+    def validate_presence (self, dataset: list[np.ndarray | pd.DataFrame]):
         try:
             if any(dset.shape == None for dset in dataset):
                 raise TypeError(self.NULL_DATASET_ERROR)
-            if len(dataset) == 2:
-                if dataset[0].shape[0] != dataset[1].shape[0]:
-                    raise ValueError(self.UNEQUAL_SHAPE_ERROR)
-
-            return True
+            else:
+                return True
         except TypeError as null_dataset_error:
             print(null_dataset_error)
             exit(EXIT_FAILURE)
+
+    def validate_shapes (self, dataset_x: Union[np.ndarray | pd.DataFrame], dataset_y: Union[np.ndarray | pd.DataFrame]):
+        try:
+            if dataset_x.shape[0] != dataset_y.shape[0]:
+                raise ValueError(self.UNEQUAL_SHAPE_ERROR)
         except ValueError as shape_mismatch_error:
             print(shape_mismatch_error)
             exit(EXIT_FAILURE)
@@ -45,38 +47,27 @@ class MeanSquaredError:
     def __init__ (self):
         self.validator = Validator()
 
-    def compute (
-        self,
-        test_preds: Union[np.ndarray | pd.DataFrame],
-        model_preds: Union[np.ndarray | pd.DataFrame]
-    ):
-        if self.validator.validate([test_preds, model_preds]):
+    def compute (self, test_preds: Union[np.ndarray | pd.DataFrame], model_preds: Union[np.ndarray | pd.DataFrame]):
+        if (self.validator.validate_presence([test_preds, model_preds]) and
+            self.validator.validate_shapes(test_preds, model_preds)
+        ):
             return 1 / float(len(test_preds)) * np.mean((test_preds - model_preds) ** 2)
 
 class LinearRegression:
     def __init__(self, num_of_epochs: int = None, learning_rate: float = None, fit_intercept: bool = True):
-        self.partial_dev_m = None
-        self.partial_dev_b = None
+        self.partial_dev_m = np.random.rand()
+        self.partial_dev_b = np.random.rand()
         self.epochs = num_of_epochs
         self.learning_rate = learning_rate
         self.fit_intercept = fit_intercept
         self.validator = Validator()
 
-    def _initialize_partial_derivatives (self, train_x: np.ndarray):
-        # Initializing the partial derivative M while taking into account weight generation
-        if self.fit_intercept:
-            self.partial_dev_m = np.random.rand(train_x.shape[1])
-            return np.hstack([np.ones((train_x.shape[0], 1)), train_x])
-        else:
-            return np.hstack(np.ones([train_x.shape[0], 1], train_x))
-
-        self.partial_dev_b = np.random.rand() if self.fit_intercept else 0.0
-
     def _compute_weights (self, train_x: np.ndarray, train_y: np.ndarray, predictions: np.ndarray):
-        return -(2 / float(len(train_x))) * np.sum(train_x * (train_y - predictions))
+        preds = train_y - predictions
+        return -2 / len(train_x) * train_x.T @ (train_y - predictions)
 
     def _compute_bias (self, train_y: np.ndarray, predictions: np.ndarray):
-        return -(2 / float(len(train_y))) * np.sum(train_y - predictions)
+        return -2 / float(len(train_y)) * np.sum(train_y - predictions)
 
     def _update_weights_gradients (self, computed_weight_gradient: Union[int | float]):
         self.partial_dev_m -= self.learning_rate * computed_weight_gradient
@@ -84,16 +75,14 @@ class LinearRegression:
     def _update_bias_gradients (self, computed_bias_gradient: Union[int | float]):
         self.partial_dev_b -= self.learning_rate * computed_bias_gradient
 
-    def fit (
-        self,
-        train_x: Union[np.ndarray | pd.DataFrame],
-        train_y: Union[np.ndarray | pd.DataFrame]
-    ):
-        train_x = self._initialize_partial_derivatives(train_x)
+    def fit (self, train_x: Union[np.ndarray | pd.DataFrame], train_y: Union[np.ndarray | pd.DataFrame]):
+        #train_x = np.hstack([np.ones((train_x.shape[0], 1)), train_x])
+        self.partial_dev_m = np.zeros(train_x.shape[1])
+        self.partial_dev_b = np.random.rand() if self.fit_intercept else 0.0
 
-        if self.validator.validate([train_x, train_y]):
+        if self.validator.validate_presence([train_x, train_y]):
             for epoch in range(self.epochs):
-                print(f"[+] Epoch: {epoch} | Partial Dev M: {self.partial_dev_m} | Partial Dev B: {self.partial_dev_b}\n")
+                print(f"[+] Epoch: {epoch + 1} \nPartial Dev M: {self.partial_dev_m} \nPartial Dev B: {self.partial_dev_b}\n")
                 predictions = np.dot(train_x, self.partial_dev_m) + self.partial_dev_b
                 weights_gradient = self._compute_weights(train_x, train_y, predictions)
                 bias_gradient = self._compute_bias(train_y, predictions)
@@ -101,7 +90,7 @@ class LinearRegression:
                 self._update_bias_gradients(bias_gradient)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
-        if self.validator.validate([test_x]):
+        if self.validator.validate_presence([test_x]):
             return self.partial_dev_m * test_x + self.partial_dev_b
 
 def main ():
@@ -117,14 +106,10 @@ def main ():
     )
 
     # Initializing the model and the loss class'
-    lin_reg = LinearRegression(10, 0.001)
+    lin_reg = LinearRegression(50, 0.0001)
     mse = MeanSquaredError()
 
     # Training the model
     lin_reg.fit(tr_x, tr_y)
 
-    # Getting the model predictions
-    model_preds = lin_reg.predict(ts_x)
-
 main()
-
