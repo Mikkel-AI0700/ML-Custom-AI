@@ -31,8 +31,8 @@ class MeanSquaredError:
 
 class LinearRegression:
     def __init__(self, num_of_epochs: int = None, learning_rate: float = None, fit_intercept: bool = True):
-        self.partial_dev_m = np.random.rand()
-        self.partial_dev_b = np.random.rand() if fit_intercept else 0.0
+        self.partial_dev_m = None
+        self.partial_dev_b = None
         self.epochs = num_of_epochs
         self.learning_rate = learning_rate
         self.fit_intercept = fit_intercept
@@ -55,8 +55,8 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
-        # Initializing the weights and adding intercept
-        train_x = np.hstack([np.ones((train_x.shape[0], 1)), train_x])
+        # Initializing the weights and "bias"
+        train_x = np.hstack([np.ones(train_x.shape[0], 1), train_x])
         self.partial_dev_m = np.zeros((train_x.shape[1]))
 
         if self.validator.validate([train_x, train_y]):
