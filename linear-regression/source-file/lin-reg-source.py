@@ -2,6 +2,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import scipy as scp
+from validator import validators
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -32,7 +33,7 @@ class Validator:
 
 class MeanSquaredError:
     def __init__ (self):
-        self.validator = Validator()
+        pass
 
     def compute (
         self,
