@@ -22,10 +22,20 @@ class MeanSquaredError:
         self.validator = Validator()
 
     def compute (
-        self,
-        test_preds: Union[np.ndarray | pd.DataFrame],
+        self, 
+        test_preds: Union[np.ndarray | pd.DataFrame], 
         model_preds: Union[np.ndarray | pd.DataFrame]
     ):
+        if (self.validator.validate_existence([test_preds, model_preds]) and
+            self.validator.validate_shapes(test_preds, model_preds)
+        ):
+            pass
+
+        if isinstance(test_preds, pd.DataFrame):
+            test_preds = test_preds.to_numpy()
+        if isinstance(model_preds, pd.DataFrame):
+            model_preds = model_preds.to_numpy()
+
         if self.validator.validate([test_preds, model_preds]):
             return 1 / float(len(test_preds)) * np.mean((test_preds - model_preds) ** 2)
 
@@ -55,6 +65,13 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
+        # Converting the training datasets to numpy first
+        if self.validator.validate_existence([train_x, train_y]):
+            if isinstance(train_x, pd.DataFrame):
+                train_x = train_x.to_numpy()
+            if isinstance(train_y, pd.DataFrame):
+                train_y = train_y.to_numpy()
+
         # Initializing the weights and "bias"
         train_x = np.hstack([np.ones(train_x.shape[0], 1), train_x])
         self.partial_dev_m = np.zeros((train_x.shape[1]))
