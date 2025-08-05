@@ -19,25 +19,26 @@ np.random.seed(42)
 
 class MeanSquaredError:
     def __init__ (self):
-        self.validator = Validator()
+        self.validator = Validate()
 
     def compute (
         self, 
         test_preds: Union[np.ndarray | pd.DataFrame], 
         model_preds: Union[np.ndarray | pd.DataFrame]
     ):
-        if (self.validator.validate_existence([test_preds, model_preds]) and
-            self.validator.validate_shapes(test_preds, model_preds)
+        # Doing existence and shape checks on both dataset inputs
+        if (self.validate.validate_existence([test_preds, model_preds]) and
+            self.validate.validate_shapes(test_preds, model_preds)
         ):
             pass
 
+        # Converting either or both to ndarrays for compatibility
         if isinstance(test_preds, pd.DataFrame):
             test_preds = test_preds.to_numpy()
         if isinstance(model_preds, pd.DataFrame):
             model_preds = model_preds.to_numpy()
 
-        if self.validator.validate([test_preds, model_preds]):
-            return 1 / float(len(test_preds)) * np.mean((test_preds - model_preds) ** 2)
+        return 1 / len(test_preds) * np.mean((test_preds - model_preds) ** 2) 
 
 class LinearRegression:
     def __init__(self, num_of_epochs: int = None, learning_rate: float = None, fit_intercept: bool = True):
@@ -46,7 +47,7 @@ class LinearRegression:
         self.epochs = num_of_epochs
         self.learning_rate = learning_rate
         self.fit_intercept = fit_intercept
-        self.validator = Validator()
+        self.validator = Validate()
 
     def _compute_weights (self, train_x: np.ndarray, train_y: np.ndarray, predictions: np.ndarray):
         return -2 / len(train_x) * np.sum(train_x * (train_y - predictions))
@@ -73,10 +74,10 @@ class LinearRegression:
                 train_y = train_y.to_numpy()
 
         # Initializing the weights and "bias"
-        train_x = np.hstack([np.ones(train_x.shape[0], 1), train_x])
+        train_x = np.hstack([np.ones((train_x.shape[0], 1)), train_x])
         self.partial_dev_m = np.zeros((train_x.shape[1]))
 
-        if self.validator.validate([train_x, train_y]):
+        if self.validator.validate_existence([train_x, train_y]):
             for epoch in range(self.epochs):
                 print(f"[+] Epoch: {epoch} | Partial Dev M: {self.partial_dev_m} | Partial Dev B: {self.partial_dev_b}\n")
                 predictions = np.dot(train_x, self.partial_dev_m)
