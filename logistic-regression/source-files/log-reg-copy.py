@@ -11,11 +11,13 @@ from validator.validator import Validate
 from metrics.classification.classif_metrics import Accuracy
 
 class LogisticRegression:
-    def __init__ (self, epochs: int = 1000, fit_intercept: bool = True):
+    def __init__ (self, learning_rate: Union[int | float] = 0.0001, epochs: int = 1000, fit_intercept: bool = True):
         self.partial_derivative_m = None
         self.partial_derivative_b = None
-        self.fit_intercept = fit_intercept
+        self.learning_rate = learning_rate
         self.epochs = epochs
+        self.fit_intercept = fit_intercept
+        self.validator = Validate()
 
     def _initialize_weights (self, train_x: np.ndarray):
         self.partial_derivative_m = np.zeros((train_x.shape[1]))
@@ -25,32 +27,27 @@ class LogisticRegression:
         else:
             self.partial_derivative_b = 0.0
 
-    def _compute_weights_derivative (
-        self,
-        train_x: np.ndarray,
-        train_y: np.ndarray
-    ):
-        pass
+    def _compute_weights_derivative (self, train_x: np.ndarray, train_y: np.ndarray,pred_y: np.ndarray):
+        return -2 / len(train_x) * np.sum(train_x * (train_y - pred_y))
 
-    def _compute_bias_derivative (self):
-        pass
+    def _compute_bias_derivative (self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
+        return -2 / len(train_x) * np.sum(train_y - pred_y)
 
-    def _update_weights_derivatives (self):
-        pass
+    def _update_weights_derivatives (self, computed_weights_gradients: np.ndarray):
+        self.partial_derivative_m = self.learning_rate - computed_weights_gradients
 
-    def _update_bias_derivatives (self):
-        pass
+    def _update_bias_derivatives (self, computed_bias_gradients: np.ndarray):
+        self.partial_derivative_b = self.learning_rate - computed_bias_gradients
 
     def _sigmoid_function (self, pred_y: np.ndarray):
-        pass
+        return 1 / 1 + np.e ** -pred_y
 
-    def fit (
-        self,
-        train_x: Union[np.ndarray | pd.DataFrame],
-        train_y: Union[np.ndarray | pd.DataFrame]
-    ):
+    def fit (self, train_x: Union[np.ndarray | pd.DataFrame], train_y: Union[np.ndarray | pd.DataFrame]):
         for epoch in range(self.epochs):
-            pass
+            print(f"Epoch: {epoch} | M: {self.partial_derivative_m} | B: {self.partial_derivative_b}")
+
+            predictions = np.dot(train_x, self.partial_derivative_m)
+
 
     def predict (
         self,
