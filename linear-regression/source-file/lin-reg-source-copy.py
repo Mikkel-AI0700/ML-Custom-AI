@@ -49,6 +49,16 @@ class LinearRegression:
         self.fit_intercept = fit_intercept
         self.validator = Validate()
 
+    def _initialize_partial_derivatives (self, train_x: np.ndarray):
+        # Initializing the partial derivative M
+        self.partial_dev_m = np.zeros((train_x.shape[1]))
+
+        # Initializing the partial derivative B
+        if not self.fit_intercept:
+            self.partial_dev_b = 0.0
+        else:
+            return np.hstack([np.ones((train_x.shape[0], 1)), train_x])
+
     def _compute_weights (self, train_x: np.ndarray, train_y: np.ndarray, predictions: np.ndarray):
         return -2 / len(train_x) * np.sum(train_x * (train_y - predictions))
 
@@ -74,9 +84,9 @@ class LinearRegression:
                 train_y = train_y.to_numpy()
 
         # Initializing the weights and "bias"
-        train_x = np.hstack([np.ones((train_x.shape[0], 1)), train_x])
-        self.partial_dev_m = np.zeros((train_x.shape[1]))
+        train_x = self._initialize_partial_derivatives(train_x)
 
+        # Start the training loop
         if self.validator.validate_existence([train_x, train_y]):
             for epoch in range(self.epochs):
                 print(f"[+] Epoch: {epoch} | Partial Dev M: {self.partial_dev_m} | Partial Dev B: {self.partial_dev_b}\n")
@@ -88,7 +98,11 @@ class LinearRegression:
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
         if self.validator.validate([test_x]):
-            return self.partial_dev_m * test_x + self.partial_dev_b
+            pass
+        if isinstance(test_x, pd.DataFrame):
+            test_x = test_x.to_numpy()
+
+        return np.dot(test_x, self.partial_dev_m)
 
 def main ():
     # Loading the datasets
