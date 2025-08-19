@@ -13,6 +13,8 @@ TODO:
     -- Write logic for multiclass classification
         --- Write comparing logic for multiclass TP, TN, FP, FN
 
+P.S Isn't binary and multiclass comparison logic the same?
+
 REMOVE IN DEPLOYMENT!
 """
 def metric_preds_counter (
@@ -64,18 +66,12 @@ def accuracy (
     average="binary"
 ):
     if metric_validator_helper(true_y, pred_y, accuracy):
-        # Summing up the total count of TP and TN using Numpy's logical_and() function
-        true_positive = np.sum(np.logical_and(true_y == 1, pred_y == 1))
-        true_negative = np.sum(np.logical_and(true_y == 0, pred_y == 0))
-
+        true_positive, true_negative, _, _ = metric_preds_counter(true_y, pred_y)
         return (true_positive + true_negative) / len(pred_y)
 
 def precision (true_y: Union[np.ndarray | pd.DataFrame], pred_y: Union[np.ndarray | pd.DataFrame]):
-    if metric_validator_helper(true_y, pred_y, accuracy):
-        # Summing up the total count of TP and FP using Numpy's logical_and() function
-        true_positive = np.sum(np.logical_and(true_y == 1, pred_y == 1))
-        false_positive = np.sum(np.logical_and(true_y == 0, pred_y == 1))
-
+    if metric_validator_helper(true_y, pred_y, precision):
+        true_positive, _, false_positive, _ = metric_preds_counter(true_y, pred_y)
         return true_positive / (true_positive + false_positive)
 
 def recall (true_y: Union[np.ndarray | pd.DataFrame], pred_y: Union[np.ndarray | pd.DataFrame]):
