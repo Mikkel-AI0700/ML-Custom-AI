@@ -35,5 +35,5 @@ function main ($1) {
     fi
 }
 
-main
+main $1
 
