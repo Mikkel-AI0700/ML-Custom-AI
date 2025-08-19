@@ -1,4 +1,4 @@
-import inspect
+from inspect import signature
 from typing import Callable
 import numpy as np
 import pandas as pd
@@ -47,19 +47,30 @@ class DatasetValidation:
 class ClassificationMetricValidation:
     def __init__ (self):
         self.BINARY_LIMIT = 2
-        self.ZERO_DIVISION_ERROR = "Error: Your model hasn't predicted anything \"correct\""
-        self.MULTI_ON_BINARY_ERROR = "Error: Average parameter is set to binary but classes is multiclass"
+        self.ZERO_DIVISION_ERROR = "Error: Your model hasn't predicted anything. Recheck model predictions"
+        self.MULTI_ON_BINARY_ERROR = "Error: Average parameter is set to binary but y_true is multiclass"
 
     def _return_function_arguments (self, metric_function: Callable):
-        return inspect.getfullargspec(metric_function)
+        return signature(metric_function)
 
-    def check_label_count (self, y_true: np.ndarray, classif_metric: Callable):
+    def validate_zero_division (self, y_pred: np.ndarray):
         try:
-            args_tuple = self._return_function_arguments(classif_metric)
-            if np.unique(y_true) > self.BINARY_LIMIT:
-                pass
-        except:
-            pass
+            if np.all(y_pred == 0):
+                raise ZeroDivisionError(self.ZERO_DIVISION_ERROR)
+        except ZeroDivisionError as zero_div_error:
+            print(zero_div_error)
+            exit(EXIT_FAILURE)
+
+    def validate_label_count (self, y_true: np.ndarray, classif_metric: Callable):
+        try:
+            func_args = self._return_function_arguments(classif_metric)
+            if (np.unique(y_true) > self.BINARY_LIMIT and
+                func_args.get("average") == "binary"
+            ):
+                raise ValueError(self.MULTI_ON_BINARY_ERROR)
+        except ValueError as multi_binary_error:
+            print(multi_binary_error)
+            exit(EXIT_FAILURE)
 
     def check_parameters (self):
         pass
