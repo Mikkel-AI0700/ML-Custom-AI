@@ -1,17 +1,17 @@
-#pass Pytho SL
 from typing import Union
-
-# Python third-party imports
 import numpy as np
 import pandas as pd
 import scipy as scp
-
-# Python local imports
 from validator.validator import Validate
-from metrics.classification.classif_metrics import Accuracy
+from metrics.classification.classif_metrics import log_loss
 
 class LogisticRegression:
-    def __init__ (self, learning_rate: Union[int | float] = 0.0001, epochs: int = 1000, fit_intercept: bool = True):
+    def __init__ (
+        self, 
+        learning_rate: Union[int | float] = 0.0001, 
+        epochs: int = 1000, 
+        fit_intercept: bool = True
+    ):
         self.partial_derivative_m = None
         self.partial_derivative_b = None
         self.learning_rate = learning_rate
@@ -47,11 +47,12 @@ class LogisticRegression:
             print(f"Epoch: {epoch} | M: {self.partial_derivative_m} | B: {self.partial_derivative_b}")
 
             predictions = np.dot(train_x, self.partial_derivative_m)
+            cross_entrop = log_loss(train_y, predictions)
+            computed_weights = self._compute_weights_derivative(train_x, train_y, predictions)
+            computed_bias = self._compute_bias_derivative(train_x, train_y, predictions)
+            self._update_weights_derivatives(computed_weights)
+            self._update_bias_derivatives(computed_bias)
 
-
-    def predict (
-        self,
-        test_x: Union[np.ndarray | pd.DataFrame]
-    ):
+    def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
         pass
 
