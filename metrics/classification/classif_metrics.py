@@ -69,19 +69,37 @@ def accuracy (
         true_positive, true_negative, _, _ = metric_preds_counter(true_y, pred_y)
         return (len(true_positive) + len(true_negative)) / len(pred_y)
 
-def precision (true_y: Union[np.ndarray | pd.DataFrame], pred_y: Union[np.ndarray | pd.DataFrame]):
+def precision (
+    true_y: Union[np.ndarray | pd.DataFrame], 
+    pred_y: Union[np.ndarray | pd.DataFrame]
+):
     if metric_validator_helper(true_y, pred_y, precision):
         true_positive, _, false_positive, _ = metric_preds_counter(true_y, pred_y)
         return len(true_positive) / (len(true_positive) + len(false_positive))
 
-def recall (true_y: Union[np.ndarray | pd.DataFrame], pred_y: Union[np.ndarray | pd.DataFrame]):
+def recall (
+    true_y: Union[np.ndarray | pd.DataFrame], 
+    pred_y: Union[np.ndarray | pd.DataFrame]
+):
     if metric_validator_helper(true_y, pred_y, precision):
         true_positive, _, _, false_negative = metric_preds_counter(true_y, pred_y)
         return len(true_positive) / (len(true_positive) + len(false_negative))
 
-def f1 (true_y: Union[np.ndarray | pd.DataFrame], pred_y: Union[np.ndarray | pd.DataFrame]):
+def f1 (
+    true_y: Union[np.ndarray | pd.DataFrame], 
+    pred_y: Union[np.ndarray | pd.DataFrame]
+):
     if metric_validator_helper(true_y, pred_y, f1):
         precision_score = precision(true_y, pred_y)
         recall_score = recall(true_y, pred_y)
         return 2 * ((precision_score * recall_score) / (precision_score + recall_score))
+
+def log_loss (
+    true_y: Union[np.ndarray | pd.DataFrame], 
+    pred_y: Union[np.ndarray | pd.DataFrame]
+):
+    if metric_validator_helper(true_y, pred_y, f1):
+        true_y_difference = 1 - true_y
+        pred_y_difference = 1 - pred_y
+        return -1 / len(true_y) * np.sum(true_y * np.log(pred_y) + true_y_difference * pred_y_difference)
 
