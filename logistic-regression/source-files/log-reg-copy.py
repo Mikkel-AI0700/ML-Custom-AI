@@ -46,8 +46,11 @@ class LogisticRegression:
         for epoch in range(self.epochs):
             print(f"Epoch: {epoch} | M: {self.partial_derivative_m} | B: {self.partial_derivative_b}")
 
+            # Training inference and loss calculating
             predictions = np.dot(train_x, self.partial_derivative_m)
-            cross_entrop = log_loss(train_y, predictions)
+
+
+            # Gradient computation and updating
             computed_weights = self._compute_weights_derivative(train_x, train_y, predictions)
             computed_bias = self._compute_bias_derivative(train_x, train_y, predictions)
             self._update_weights_derivatives(computed_weights)
