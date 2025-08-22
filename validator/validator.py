@@ -16,7 +16,7 @@ class DatasetValidation:
 
     def validate_existence (self, datasets: list[np.ndarray]):
         try:
-            if any(len(dset) <= 0 for dset in datasets):
+            if any(dset.shape[0] == 0 for dset in datasets):
                 raise ValueError(self.NULL_DATASET_ERROR)
             else:
                 return True
