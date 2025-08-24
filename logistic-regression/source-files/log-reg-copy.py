@@ -42,9 +42,6 @@ class LogisticRegression:
     def _sigmoid_function (self, pred_y: np.ndarray):
         return 1 / 1 + np.e ** -pred_y
 
-    def _cost_function (self, computed_loss: np.ndarray):
-        return -1 / len(computed_loss) * np.sum(computed_loss)
-
     def fit (self, train_x: Union[np.ndarray | pd.DataFrame], train_y: Union[np.ndarray | pd.DataFrame]):
         if (self.validator.validate_existence([train_x, train_y]) and
             self.validator.validate_shapes(train_x, train_y)
