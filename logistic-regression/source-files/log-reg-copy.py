@@ -28,9 +28,9 @@ class LogisticRegression:
             self.partial_derivative_b = 0.0
 
     def _compute_weights_derivative (self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
-        return 1 / len(train_x) * train_x.T * (pred_y - train_y)
+        return 1 / len(train_x) * np.sum((pred_y - train_y)[:, np.newaxis] * train_x, axis=0)
 
-    def _compute_bias_derivative (self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
+    def _compute_bias_derivative (self, train_y: np.ndarray, pred_y: np.ndarray):
         return 1 / len(train_x) * np.sum(pred_y - train_y)
 
     def _update_weights_derivatives (self, computed_weights_gradients: np.ndarray):
