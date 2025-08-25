@@ -40,7 +40,7 @@ class LogisticRegression:
         self.partial_derivative_b = self.partial_derivative_m - self.learning_rate * computed_bias_gradients
 
     def _sigmoid_function (self, pred_y: np.ndarray):
-        return 1 / 1 + np.e ** -pred_y
+        return 1 / 1 + np.e ** -(pred_y)
 
     def fit (self, train_x: Union[np.ndarray | pd.DataFrame], train_y: Union[np.ndarray | pd.DataFrame]):
         if (self.validator.validate_existence([train_x, train_y]) and
