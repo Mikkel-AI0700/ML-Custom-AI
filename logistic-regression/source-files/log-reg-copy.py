@@ -17,7 +17,7 @@ class LogisticRegression:
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.fit_intercept = fit_intercept
-        self.validator = Validate()
+        self.validator = DatasetValidation()
 
     def _initialize_weights (self, train_x: np.ndarray):
         self.partial_derivative_m = np.zeros((train_x.shape[1]))
@@ -63,5 +63,5 @@ class LogisticRegression:
             self._update_bias_derivatives(computed_bias)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
-        pass
+        predictions = np.dot(self.partial_derivative_m, test_x)
 
