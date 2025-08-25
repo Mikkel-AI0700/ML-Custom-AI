@@ -101,5 +101,5 @@ def log_loss (
     if metric_validator_helper(true_y, pred_y, f1):
         true_y_difference = 1 - true_y
         pred_y_difference = 1 - pred_y
-        return -1 / len(true_y) * np.sum(true_y * np.log(pred_y) + true_y_difference * pred_y_difference)
+        return -(1 / len(true_y) * np.sum(true_y * np.log(pred_y) + true_y_difference * pred_y_difference))
 
