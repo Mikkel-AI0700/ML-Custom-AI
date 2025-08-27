@@ -25,15 +25,18 @@ function check_venv () {
     fi
 }
 
-function main ($1) {
+function main () {
     if [[ ${check_tld} == "true"]] && [[ ${check_venv} == "true" ]] ; then
         if [[ $1 == "lin" ]] || [[ $1 == "lin-reg" ]] ; then
             python3 ${LIN_REG_SOURCE}
         else if [[ $1 == "log" ]] || [[ $1 == "log-reg" ]] ; then
             python3 ${LOG_REG_SOURCE}
+        else
+            echo -e "[-] Error: User passed argument doesn't exist"
+            exit 1
         fi
     fi
 }
 
-main $1
+main
 
