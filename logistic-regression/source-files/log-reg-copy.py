@@ -63,5 +63,5 @@ class LogisticRegression:
             self._update_bias_derivatives(computed_bias)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
-        predictions = np.dot(self.partial_derivative_m, test_x)
+        return self._sigmoid_function(np.dot(test_x, self.partial_derivative_m))
 
