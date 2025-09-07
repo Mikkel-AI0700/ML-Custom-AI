@@ -22,15 +22,16 @@ class LinearRegression:
         self.partial_derivative_m = np.zeros((train_x.shape[1]))
 
         if self.fit_intercept:
-            self.partial_derivative_b = np.hstack([np.ones((train_x.shape[0], 1)), train_x])
-        else:
             self.partial_derivative_b = 0.0
 
+    def _compute_cost (self, train_y: np.ndarray, pred_y: np.ndarray):
+        return np.sum(np.square(pred_y - train_y))
+
     def _compute_weights_gradient (self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
-        return -(2 / len(train_x)) * np.dot(train_x.T, (train_y - pred_y))
+        return 1 / len(train_x) * np.dot(train_x.T, (pred_y - train_y))
 
     def _compute_bias_gradients (self, train_y: np.ndarray, pred_y: np.ndarray):
-        return -(2 / len(train_y)) * np.sum(train_y - pred_y)
+        return 1 / len(train_y) * np.sum(pred_y - train_y)
 
     def _update_weights_gradient (self, computed_weights_gradients: np.ndarray):
         self.partial_derivative_m -= self.learning_rate * computed_weights_gradients
@@ -56,12 +57,11 @@ class LinearRegression:
             print(f"[+] Train y is Pandas. Converted to Numpy -> Rows: {train_y.shape[0]} | Columns: {train_y.shape[1]}")
 
         self._initialize_weights_bias(train_x)
-
         for epoch in range(self.epochs):
             print(f"Batch: {epoch + 1} | M: {self.partial_derivative_m}")
             
             # Main training loop
-            predictions = np.dot(train_x, self.partial_derivative_m)
+            predictions = np.dot(train_x, self.partial_derivative_m) + self.partial_derivative_b
             computed_weights = self._compute_weights_gradient(train_x, train_y, predictions)
             computed_bias = self._compute_bias_gradients(train_y, predictions)
             self._update_weights_gradient(computed_weights)
@@ -76,14 +76,14 @@ class LinearRegression:
 
         #test_x = np.hstack([np.ones((test_x.shape[0], 1)), test_x])
 
-        return np.dot(test_x, self.partial_derivative_m)
+        return np.dot(test_x, self.partial_derivative_m) + self.partial_derivative_b
 
 # TESTING PURPOSES ONLY!
 # main() FUNCTION WILL BE REMOVED IN lin-reg-source.py
 def main ():
-    linreg_instance = LinearRegression(epoch=35, learning_rate=1e-4)
+    linreg_instance = LinearRegression(epoch=2300, learning_rate=1e-3)
     X, Y = make_regression(
-        n_samples=1000,
+        n_samples=200_000,
         n_features=5,
         random_state=42
     )
