@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 class LogisticRegression:
     __parameter_constraints__ = {
         "epochs": int,
-        "learning_rate": float,
+        "learning_rate": (int, float),
         "fit_intercept": bool
     }
 
@@ -83,20 +83,20 @@ class LogisticRegression:
             print(f"[+] Train x is Pandas, Converted to Numpy -> Rows: {train_x.shape[0]} | Columns: {train_x.shape[1]}")
 
         logit_predictions = np.dot(test_x, self.partial_derivative_m) + self.partial_derivative_b
-        print(f"Logits: {logit_predictions}")
-        return self._sigmoid_function(logit_predictions)
+        squashed_predictions = self._sigmoid_function(logit_predictions)
+        return np.where(squashed_predictions >= 0.5, 1, 0)
 
 def main ():
     classification_generator_parameters = {
-        "n_samples": 500_000,
+        "n_samples": 900_000,
         "n_features": 5,
         "n_informative": 3,
         "random_state": 42
     }
 
     logreg_instance_parameters = {
-        "epochs": 2000,
-        "learning_rate": 1e-3
+        "epochs": 1500,
+        "learning_rate": 1e-2
     }
 
     logreg_instance = LogisticRegression(**logreg_instance_parameters)
@@ -114,9 +114,7 @@ def main ():
     logreg_instance.fit(tr_x, tr_y)
     predictions = logreg_instance.predict(ts_x)
 
-    print(predictions)
-    
-    print(f"Accuracy score: {accuracy_score(predictions, ts_y)}")
+    print(f"Accuracy score: {accuracy_score(ts_y, predictions)} \nPrecision score: {precision_score(ts_y, predictions)}")
 
 main()
 
