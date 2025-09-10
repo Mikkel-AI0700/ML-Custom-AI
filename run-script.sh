@@ -3,7 +3,7 @@
 # Global constants
 PYTHON_TLD=$(pwd)
 LIN_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/linear-regression/source-file/lin-reg-new.py"
-LOG_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/logistic-regression/source-files/log-reg-main.py"
+LOG_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/logistic-regression/source-files/log-reg-new.py"
 
 tld_passed=0
 venv_passed=0
@@ -40,7 +40,7 @@ function main () {
           echo "[+] Running Linear Regression model"
           python3 ${LIN_REG_SOURCE}
       elif [[ "$1" == "logreg" ]] ; then
-          :
+          python3 ${LOG_REG_SOURCE}
       fi
   fi
 }
