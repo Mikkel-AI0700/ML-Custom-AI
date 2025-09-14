@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 from errors.DatasetErrors import (
     UnequalShapesException,
-    UnequalDatatypesException
+    UnequalDatatypesException,
+    InfinityException,
+    NaNException
 )
 
 EXIT_SUCCESS = 0
@@ -12,26 +14,59 @@ EXIT_FAILURE = 1
 
 class DatasetValidation:
     def __init__ (self):
-        self.UNEQUAL_SHAPES_ERROR = "{} -> X: Row: {} | Column: {}, Y: Row: {} | Column: {}"
-        self.UNEQUAL_DATATYPES_ERROR = "{} -> X dtype: {} | Y dtype: {}"
+        self.datasets_with_infinity = []
+        self.datasets_with_nan = []
+
+    def get_inf_datasets
+
+    def __check_inf (self, X: list[np.ndarray]):
+        for dataset in X:
+            if np.isinf(dataset):
+                self.datasets_with_infinity.append(dataset)
+
+    def __check_nan (self, X: list[np.ndarray]):
+        for dataset in X:
+            if np.isnan(dataset):
+                self.datasets_with_nan.append(dataset)
 
     def check_shapes (self, X: np.ndarray, Y: np.ndarray):
         try:
             if X.shape[0] != Y.shape[0]:
-                raise UnequalShapesException(self.UNEQUAL_SHAPES_ERROR)
+                raise UnequalShapesException(X, Y)
             else:
                 return True
         except UnequalShapesException as use_message:
-            print(use_message.format(use_message, X.shape[0], X.shape[1], Y.shape[0], Y.shape[1]))
+            print(use_message)
             exit(EXIT_FAILURE)
 
     def check_datatypes (self, X: np.ndarray, Y: np.ndarray):
         try:
             if X.dtype != Y.dtype:
-                raise UnequalDatatypesException(self.UNEQUAL_DATATYPES_ERROR)
+                raise UnequalDatatypesException(X, Y)
             else:
                 return True
         except UnequalDatatypesException as ude_message:
-            print(ude_message.format(ude_message, X.dtypes, Y.dtypes))
+            print(ude_message.format(ude_message)
             exit(EXIT_FAILURE)
 
+    def infinity_checks (self, X: list[np.ndarray]):
+        try:
+            map(self.__check_inf, X)
+            if len(self.datasets_with_infinity) > 0:
+                raise InfinityException(self.datasets_with_infinity)
+            else:
+                return True
+        except InfinityException as ie_exception:
+            print(ie_exception)
+            exit(EXIT_FAILURE)
+
+    def nan_checks (self, X: list[np.ndarray]):
+        try:
+            map(self.__check_nan, X)
+            if len(self.datasets_with_nan) > 0:
+                raise NaNException(self.datasets_with_nan)
+            else:
+                return True
+        except NaNException as nan_exception:
+            print(nan_exception)
+            exit(EXIT_FAILURE)
