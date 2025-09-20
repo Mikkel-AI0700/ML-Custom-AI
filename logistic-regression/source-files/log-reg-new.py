@@ -2,6 +2,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 from validator.validator import DatasetValidation
+from base.EstimatorClass import BaseEstimator, ClassifierMixin
 
 # Importing scikit-learn classification metrics
 # It will be removed in the main source files
@@ -11,9 +12,9 @@ from sklearn.model_selection import train_test_split
 
 class LogisticRegression:
     __parameter_constraints__ = {
-        "epochs": int,
-        "learning_rate": (int, float),
-        "fit_intercept": bool
+        "epochs": [int],
+        "learning_rate": [int, float],
+        "fit_intercept": [int]
     }
 
     def __init__ (self, epochs: int, learning_rate: Union[int | float], fit_intercept: bool = True):
@@ -49,12 +50,7 @@ class LogisticRegression:
         self,
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
-    ):
-        if (self.validator.validate_existence([train_x, train_y]) and
-            self.validator.validate_shapes(train_x, train_y)
-        ):
-            pass
-
+    ):  
         if isinstance(train_x, pd.DataFrame):
             train_x = train_x.to_numpy()
             print(f"[+] Train x is Pandas, Converted to Numpy -> Rows: {train_x.shape[0]} | Columns: {train_x.shape[1]}")
@@ -62,7 +58,9 @@ class LogisticRegression:
             train_y = train_y.to_numpy()
             print(f"[+] Train y is Pandas, Converted to Numpy -> Rows: {train_y.shape[0]} | Columns: {train_y.shape[1]}")
 
+        self.validator.perform_dataset_validation(train_x, train_y)
         self._initialize_weights_bias(train_x)
+
         for epoch in range(self.epochs):
             print(f"[+] Epoch: {epoch + 1} | Partial derivative M: {self.partial_derivative_m}")
 
