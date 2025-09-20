@@ -3,7 +3,7 @@ from inspect import signature
 import numpy as np
 import pandas as pd
 from errors.DatasetErrors import (
-    NonExistentDatasets
+    NonExistentDatasets,
     UnequalShapesException,
     UnequalDatatypesException,
     InfinityException,
@@ -34,7 +34,7 @@ class DatasetValidation:
             if np.isnan(dataset):
                 self.datasets_with_nan.append(dataset)
 
-    def check_existence (self, X: list[np.ndarray]):
+    def check_existence (self, X: list[np.ndarray], Y: None):
         try:
             map(self.__check_non, X)
             if len(self.datasets_with_non) > 0:
@@ -60,10 +60,10 @@ class DatasetValidation:
             else:
                 return True
         except UnequalDatatypesException as ude_message:
-            print(ude_message.format(ude_message)
+            print(ude_message.format(ude_message))
             exit(EXIT_FAILURE)
 
-    def infinity_checks (self, X: list[np.ndarray]):
+    def infinity_checks (self, X: list[np.ndarray], Y: None):
         try:
             map(self.__check_inf, X)
             if len(self.datasets_with_infinity) > 0:
@@ -84,3 +84,16 @@ class DatasetValidation:
         except NaNException as nan_exception:
             print(nan_exception)
             exit(EXIT_FAILURE)
+
+    def perform_dataset_validation (self, X: np.ndarray, Y: np.ndarray):
+        validation_checks_list = (
+            self.check_existence,
+            self.check_shapes,
+            self.check_datatypes,
+            self.infinity_checks,
+            self.nan_checks
+        )
+
+        for validation_check in validation_checks_list:
+            validation_check(X, Y)
+
