@@ -1,5 +1,16 @@
-from typing import Union
+from typing import Union, Any
 import numpy as np
+
+class NonExistentDataset (Exception):
+    def __init__ (self, non_existent_datasets: list[Any]):
+        self.non_existent_datasets = non_existent_datasets
+        self.ned_message = (
+            "[-] Error: A dataset with either a None type or other datatype is present"
+            "Datasets with None or other datatypes: {}"
+        )
+
+    def __str__ (self):
+        return self.ned_message.format(self.non_existent_datasets)
 
 class UnequalAlignmentException (Exception):
     def __init__ (self, X: np.ndarray, Y: np.ndarray):
