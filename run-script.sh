@@ -5,6 +5,9 @@ PYTHON_TLD=$(pwd)
 LIN_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/linear-regression/source-file/lin-reg-new.py"
 LOG_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/logistic-regression/source-files/log-reg-new.py"
 
+LIN_REG_SOURCE="${PYTHON_TLD}/linear-regression/source-file/lin-reg-new.py"
+LOG_REG_SOURCE="${PYTHON_TLD}/logistic-regression/source-files/log-reg-new.py"
+
 tld_passed=0
 venv_passed=0
 
