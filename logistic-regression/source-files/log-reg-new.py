@@ -12,9 +12,9 @@ from sklearn.model_selection import train_test_split
 
 class LogisticRegression:
     __parameter_constraints__ = {
-        "epochs": [int],
-        "learning_rate": [int, float],
-        "fit_intercept": [int]
+        "epochs": (int),
+        "learning_rate": (int, float),
+        "fit_intercept": (int)
     }
 
     def __init__ (self, epochs: int, learning_rate: Union[int | float], fit_intercept: bool = True):
