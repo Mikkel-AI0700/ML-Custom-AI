@@ -8,13 +8,17 @@ from errors.ParameterErrors import (
 
 class ParameterValidator:
     def __init__ (self):
-        self.INVALID_NUMERIC_ARGUMENT = (
-            "[-] Error: A string has been detected on a int/float-only hyperparameter"
-            "Detected invalid string argument: {} | Parameter constraint: {}"
+        self.oob_exception_message = (
+            "[-] Error: A hyperparameter expecting int/float values has exceeded lower/upper limits"
+            "Hyperparameter: {} | Parameter type/limit: {}/{}"
         )
-        self.INVALID_STRING_ARGUMENT = (
-            "[-] Error: A numerical value has been detected on a string-only hyperparameter"
-            "Detected invalid numeric argument: {} | Parameter constraint: {}"
+        self.is_exception_message = (
+            "[-] Error: The hyperparameter argument doesn't exist within the expected choices"
+            "Hyperparameter: {} | Parameter choices: {}"
+        )
+        self.neh_exception_message = (
+            "[-] Error: A user has passed a unknown hyperparameter to the ML algorithm's configuration"
+            "Unknown parameter: {}"
         )
 
     def _map_parameter_arguments (self, user_args: list[Any], model_instance: Callable):
@@ -31,6 +35,7 @@ class ParameterValidator:
         parameters = self._map_parameter_arguments(user_arguments, model_instance)
         for parameter, parameter_constraint in zip(parameters.values(), parameter_constraints.values()):
             constraint_type = parameter_constraint.get("type")
+            
             minimum_threshold = parameter_constraint.get("min_thresh", None)
             maximum_threshold = parameter_constraint.get("max_thresh", None)
             choices_selection = parameter_constraint.get("choices", None)
