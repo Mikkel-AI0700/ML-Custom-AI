@@ -18,7 +18,6 @@ class ParameterValidator:
         )
         self.neh_exception_message = (
             "[-] Error: A user has passed a unknown hyperparameter to the ML algorithm's configuration"
-            "Unknown parameter: {}"
         )
 
     def _map_parameter_arguments (self, user_args: list[Any], model_instance: Callable):
@@ -33,28 +32,35 @@ class ParameterValidator:
         parameter_constraints: dict[str, Any]
     ):
         parameters = self._map_parameter_arguments(user_arguments, model_instance)
-        for parameter, parameter_constraint in zip(parameters.values(), parameter_constraints.values()):
-            constraint_type = parameter_constraint.get("type")
-            
-            minimum_threshold = parameter_constraint.get("min_thresh", None)
-            maximum_threshold = parameter_constraint.get("max_thresh", None)
-            choices_selection = parameter_constraint.get("choices", None)
-            
-            try:
-                if constraint_type == "int" or constraint_type == "float":
-                    if parameter > maximum_threshold or parameter < minimum_threshold:
-                        raise ValueError(
-                            self.INVALID_NUMERIC_ARGUMENT.format(parameter, parameter_constraint)
+        try:
+            if parameters.keys() not in parameter_constraints.keys():
+                raise NonExistentHyperparameterException(self.neh_exception_message)
+
+            for parameter, parameter_constraint in zip(parameters.values(), parameter_constraints.values()):
+                constraint_type = parameter_constraint.get("type")
+                minimum_threshold = parameter_constraint.get("min_threshold", None)
+                maximum_threshold = parameter_constraint.get("max_threshold", None)
+                choices_selection = parameter_constraint.get("choices", None)
+
+                if parameter_constraint == "int" or parameter_constraint == "float";
+                    if parameter > maximum_threshold:
+                        raise OutOfBoundsException(
+                            self.oob_exception_message.format(parameter, constraint_type, maximum_threshold)
+                        )
+                    if parameter < minimum_threshold:
+                        raise OutOfBoundsException(
+                            self.oob_exception_message.format(parameter, constraint_type, minimum_threshold)
                         )
 
-                if constraint_type == "string":
+                if parameter_constraint == "string":
                     if parameter not in choices_selection:
-                        raise ValueError(
-                            self.INVALID_STRING_ARGUMENT.format(parameter, parameter_constraint)
-                        )
-            except ValueError as incorrect_argument:
-                print(incorrect_argument)
-                exit(1)
-            else:
-                return True
+                        raise InvalidSelectionException(parameter, choices_selection)
+        except OutOfBoundsException as raised_oob_exception:
+            print(raised_oob_exception)
+        except InvalidSelectionException as raised_ie_exception:
+            print(raised_ie_exception)
+        except NonExistentHyperparameterException as raised_neh_exception:
+            print(raised_neh_exception)
+        else:
+            return True
 
