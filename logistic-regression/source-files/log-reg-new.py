@@ -1,8 +1,7 @@
 from typing import Union
 import numpy as np
 import pandas as pd
-from validator.validator import DatasetValidation
-from base.EstimatorClass import BaseEstimator, ClassifierMixin
+from validator.validator import DatasetValidation, ParameterValidator
 
 # Importing scikit-learn classification metrics
 # It will be removed in the main source files
