@@ -3,27 +3,33 @@ import numpy as np
 import pandas as pd
 from base.EstimatorClass import BaseEstimator, ClassifierMixin
 
-class Node:
+class DecisionNode:
     def __init__ (
         self,
-        feature_index: int,
-        feature_value: int,
-        computed_metric: np.float32
+        feature_index: int = None,
+        numeric_feature_condition: Union[int, float] = None,
+        categorical_feature_condition: int = None,
+        min_computed_metric_below = None,
+        min_computed_metric_above = None,
+        min_iterated_below_group = None,
+        min_iterated_above_group = None
     ):
+        self.feature_index = feature_index
+        self.numeric_feature_condition = numeric_feature_condition
+        self.categorical_feature_condition = categorical_feature_condition
+        self.min_computed_metric_below = min_computed_metric_below
+        self.min_computed_metric_above = min_computed_metric_above
+        self.min_iterated_below = min_iterated_below_group
+        self.min_iterated_above = min_iterated_above_group
         self.left_node = None
         self.right_node = None
-        self.feature_index = feature_index
-        self.feature_value = feature_value
-        self.computed_metric = computed_metric
 
-    def _determine_decision (self, hyperparameters: dict[str, Union[str, np.int32, np.float32]]):
+class LeafNode:
+    def __init__ (self, computed_probabilities: np.ndarray):
+        self.tree_computed_probabilities = computed_probabilities
+
+    def compute_argmax (self):
         pass
-
-class DecisionNode (Node):
-    pass
-
-class LeafNode (Node):
-    pass
 
 class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierMixin):
     __parameter_constraints__ = {
@@ -110,50 +116,51 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
     def _generate_thresholds (self, X: np.ndarray):
         feature_indices = self._determine_split_type(X)
         for feature_index in feature_indices:
-            yield feature_index, np.percentile(X[:, feature_index], q=np.arange(25, 100, 25))
+            for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
+                yield feature_index, feature_percentile_range
 
     def _split_data (self, X: np.ndarray):
         for feat_index, percentile_threshold in self._generate_thresholds(X):
-            group_below_threshold = np.where(X[:, feat_index] < percentile_threshold)
-            group_above_threshold = np.where(X[:, feat_index] > percentile_threshold)
+            group_below_threshold = X[:, feat_index][X[:, feat_index] < percentile_threshold]
+            group_above_threshold = X[:, feat_index][X[:, feat_index] > percentile_threshold]
 
             yield feat_index, percentile_threshold, group_below_threshold, group_above_threshold
         
     def _create_node (self, X: np.ndarray):
-        current_looped_index = None
-        current_percentile_index = None
+        below_feature_index, above_feature_index = 0
+        
+        min_computed_metric_below, min_computed_metric_above = 0
+        min_below_threshold, min_above_threshold = None
+        min_iterated_below_group, min_iterated_above_group = None
 
-        minimum_computed_below_threshold = None
-        minimum_computed_below_threshold = None
-        minimum_temporary_above_threshold = None
-        minimum_temporary_above_threshold = None
+        # TODO: Add condition to check if feature is continuous or categorical
 
-        # Compute the below_threshold group
-        # TODO: Create a if elif else ladder checking for data information theory checking
-        # TODO: If current proves to be greater than existing minumum, replace
+        for feat_index, percentile_thresh, below_group, above_group in self._split_data(X):
+            temp_metric_below = self._evaluate_split_type(below_group[:, -1])
+            temp_metric_above = self._evaluate_split_type(above_group[:, -1])
 
-        for feat_index, percent_thresh, below_group_threshold, above_group_threshold in self._split_data(X):
-            current_looped_index = feat_index
-            current_percentile_index = percent_thresh
+            if temp_metric_below < min_computed_metric_below:
+                below_feature_index = feat_index
+                min_below_threshold = percentile_thresh
+                min_computed_metric_below = temp_metric_below
+                min_iterated_below_group = below_group
 
-            # Comparing the below_threshold_group
-            if self._evaluate_split_type(below_group_threshold) < minimum_computed_below_threshold:
-                minimum_computed_below_threshold = below_group_threshold
-                self.left_node = Node(
-                    current_looped_index,
-                    current_percentile_index,
-                    self._evaluate_split_type(below_group_threshold)
-                )
-            else:
-                continue
+            if temp_metric_below < min_computed_metric_below:
+                above_feature_index = feat_index
+                min_above_threshold = feat_index
+                min_computed_metric_above = temp_metric_above
+                min_iterated_above_group = above_group
 
-            # Comparing the above_threshold_group
-            if self._evaluate_split_type(above_group_threshold) < minimum_temporary_above_threshold:
-                minimum_temporary_above_threshold = above_group_threshold
-                self.right_node = Node(
-                    current_looped_index,
-                    current_percentile_index,
-                    self._evaluate_split_type(above_group_threshold)
-                )
-            else:
-                continue
+        self.left_node = DecisionNode(
+            below_feature_index,
+            min_below_threshold,
+            min_computed_metric_below=min_computed_metric_below,
+            min_iterated_below_group=min_iterated_below_group
+        )
+
+        self.right_node = DecisionNode(
+            above_feature_index,
+            min_above_threshold,
+            min_computed_metric_above=min_computed_metric_above,
+            min_iterated_above_group=min_iterated_above_group
+        )
