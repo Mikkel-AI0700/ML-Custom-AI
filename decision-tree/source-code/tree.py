@@ -119,48 +119,33 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
                 yield feature_index, feature_percentile_range
 
-    def _split_data (self, X: np.ndarray):
+    def _split_data (self, X: np.ndarray) -> tuple[int, float, np.ndarray, np.ndarray]:
         for feat_index, percentile_threshold in self._generate_thresholds(X):
             group_below_threshold = X[:, feat_index][X[:, feat_index] < percentile_threshold]
             group_above_threshold = X[:, feat_index][X[:, feat_index] > percentile_threshold]
 
             yield feat_index, percentile_threshold, group_below_threshold, group_above_threshold
         
-    def _create_node (self, X: np.ndarray):
-        below_feature_index, above_feature_index = 0
-        
-        min_computed_metric_below, min_computed_metric_above = 0
-        min_below_threshold, min_above_threshold = None
-        min_iterated_below_group, min_iterated_above_group = None
+    def _build_decision_tree (self, X: np.ndarray):
+        below_group_index, above_group_index = 0
+        below_group_threshold, above_group_threshold = 0
 
-        # TODO: Add condition to check if feature is continuous or categorical
+        below_computed_metric, above_computed_metric = 0
+        below_iterated_group, above_iterated_group = None
 
-        for feat_index, percentile_thresh, below_group, above_group in self._split_data(X):
-            temp_metric_below = self._evaluate_split_type(below_group[:, -1])
-            temp_metric_above = self._evaluate_split_type(above_group[:, -1])
+        for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
+            temp_metric_below = self._evaluate_split_type(below_group)
+            temp_metric_above = self._evaluate_split_type(above_group)
 
-            if temp_metric_below < min_computed_metric_below:
-                below_feature_index = feat_index
-                min_below_threshold = percentile_thresh
-                min_computed_metric_below = temp_metric_below
-                min_iterated_below_group = below_group
+            if temp_metric_below < below_computed_metric:
+                below_group_index = feat_index
+                below_group_threshold = percentile_threshold
+                below_iterated_group = below_group
 
-            if temp_metric_below < min_computed_metric_below:
-                above_feature_index = feat_index
-                min_above_threshold = feat_index
-                min_computed_metric_above = temp_metric_above
-                min_iterated_above_group = above_group
+            if temp_metric_above < above_computed_metric:
+                above_group_index = feat_index
+                above_group_threshold = percentile_threshold
+                above_iterated_group = above_group
 
-        self.left_node = DecisionNode(
-            below_feature_index,
-            min_below_threshold,
-            min_computed_metric_below=min_computed_metric_below,
-            min_iterated_below_group=min_iterated_below_group
-        )
-
-        self.right_node = DecisionNode(
-            above_feature_index,
-            min_above_threshold,
-            min_computed_metric_above=min_computed_metric_above,
-            min_iterated_above_group=min_iterated_above_group
-        )
+        self.left_node = self._build_decision_tree(below_iterated_group)
+        self.right_node = self._build_decision_tree(above_iterated_group)
