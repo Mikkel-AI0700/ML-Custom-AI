@@ -29,7 +29,7 @@ class LeafNode:
         self.tree_computed_probabilities = computed_probabilities
 
     def compute_argmax (self):
-        pass
+        return np.argmax(self.tree_computed_probabilities)
 
 class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierMixin):
     __parameter_constraints__ = {
@@ -56,6 +56,9 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         self.min_samples_leaf = min_samples_leaf
         self.min_information_gain = min_information_gain
         self.max_leaf_nodes = max_leaf_nodes
+        self._recursive_max_depth = 0
+        self._recursive_max_leaf_nodes = 0
+        self._recursive_min_information_gain = 0.0
 
     def _compute_class_probability (self, X: np.ndarray) -> np.ndarray:
         """
@@ -86,14 +89,22 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         log_loss = 1 / len(Y_probabilities) * np.sum(log_loss_eq)
         return log_loss
     
+    def _compute_information_gain (self, X: np.ndarray, left_subset: np.ndarray, right_subset: np.ndarray):
+        left_subset_impurity = self._evaluate_split_type(left_subset)
+        right_subset_impurity = self._evaluate_split_type(right_subset)
+
+        left_subset_weighted = len(left_subset) / len(X) * left_subset_impurity
+        right_subset_weighted = len(right_subset) / len(X) * right_subset_impurity
+        
+        return left_subset_weighted + right_subset_weighted
+    
     def _evaluate_split_type (self, X: np.ndarray):
         if self.split_metric == "gini":
             return self._compute_impurity(X)
         elif self.split_metric == "entropy":
             return self._compute_entropy(X)
         else:
-            return self._compute_log_loss() # Volatile code
-        # TODO: Correct the data that's being passed in the computing gini and entropy    
+            return self._compute_log_loss() # WARNING: Very volatile code. Don't be stupid and run this line ;)
     
     def _determine_split_type (self, X: np.ndarray) -> np.ndarray:
         feature_indices_range = list(range(X.shape[1] - 1))
@@ -119,33 +130,36 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
                 yield feature_index, feature_percentile_range
 
-    def _split_data (self, X: np.ndarray) -> tuple[int, float, np.ndarray, np.ndarray]:
-        for feat_index, percentile_threshold in self._generate_thresholds(X):
-            group_below_threshold = X[:, feat_index][X[:, feat_index] < percentile_threshold]
-            group_above_threshold = X[:, feat_index][X[:, feat_index] > percentile_threshold]
-
-            yield feat_index, percentile_threshold, group_below_threshold, group_above_threshold
-        
     def _build_decision_tree (self, X: np.ndarray):
-        below_group_index, above_group_index = 0
-        below_group_threshold, above_group_threshold = 0
-
-        below_computed_metric, above_computed_metric = 0
-        below_iterated_group, above_iterated_group = None
+        best_computed_information_gain = 0
+        best_split_index = 0
+        best_split_condition = 0
+        best_computed_left_split = None
+        best_computed_right_split = None
 
         for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
-            temp_metric_below = self._evaluate_split_type(below_group)
-            temp_metric_above = self._evaluate_split_type(above_group)
+            computed_information_gain = self._compute_information_gain(X, below_group, above_group)
+            if computed_information_gain > best_computed_information_gain:
+                best_split_index = feat_index
+                best_split_condition = percentile_threshold
+                best_computed_left_split = below_group
+                best_computed_right_split = above_group
 
-            if temp_metric_below < below_computed_metric:
-                below_group_index = feat_index
-                below_group_threshold = percentile_threshold
-                below_iterated_group = below_group
+            # TODO: Add logic here that will evaluate below and above threshold splits
+            # TODO: information gain and update the tracking variables
 
-            if temp_metric_above < above_computed_metric:
-                above_group_index = feat_index
-                above_group_threshold = percentile_threshold
-                above_iterated_group = above_group
+        if self._recursive_max_depth == self.max_depth:
+            return "[+] Decision Tree has already reached the max depth"
+        if self._recursive_max_leaf_nodes == self.max_leaf_nodes:
+            return "[+] Decision Tree has already reached the maximum amount of leaf nodes"
+        if self._recursive_min_information_gain == self.min_information_gain:
+            return "[+] Decision Tree has already the minimum acceptable information gain"
+        
+        self.left_node = self._build_decision_tree(best_computed_left_split)
+        self.right_node = self._build_decision_tree(best_computed_right_split)
 
-        self.left_node = self._build_decision_tree(below_iterated_group)
-        self.right_node = self._build_decision_tree(above_iterated_group)
+    def fit (self, X: np.ndarray):
+        self._build_decision_tree(X)
+
+    def predict (self, X: np.ndarray):
+        pass
