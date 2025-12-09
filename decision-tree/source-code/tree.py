@@ -1,26 +1,22 @@
 from typing import Any, Union
 import numpy as np
 import pandas as pd
+from validator.validator import DatasetValidation
+from validator import ParameterValidator
 from base.EstimatorClass import BaseEstimator, ClassifierMixin
 
 class DecisionNode:
     def __init__ (
         self,
-        feature_index: int = None,
-        numeric_feature_condition: Union[int, float] = None,
-        categorical_feature_condition: int = None,
-        min_computed_metric_below = None,
-        min_computed_metric_above = None,
-        min_iterated_below_group = None,
-        min_iterated_above_group = None
+        split_feat_index: int,
+        split_feat_num_condition: int,
+        split_feat_cat_condition: Union[int, str],
+        information_gain: float
     ):
-        self.feature_index = feature_index
-        self.numeric_feature_condition = numeric_feature_condition
-        self.categorical_feature_condition = categorical_feature_condition
-        self.min_computed_metric_below = min_computed_metric_below
-        self.min_computed_metric_above = min_computed_metric_above
-        self.min_iterated_below = min_iterated_below_group
-        self.min_iterated_above = min_iterated_above_group
+        self.feat_index = split_feat_index
+        self.feat_num_condition = split_feat_num_condition
+        self.feat_cat_condition = split_feat_cat_condition
+        self.information_gain = information_gain
         self.left_node = None
         self.right_node = None
 
@@ -35,7 +31,6 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
     __parameter_constraints__ = {
         "split_metric": (str),
         "split_type": (str),
-        "max_depth": (np.int32),
         "min_samples_leaf": (np.int32),
         "min_information_gain": (np.float32),
         "max_leaf_nodes": (np.int32)
@@ -48,7 +43,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         max_depth: np.int32 = 10,
         min_samples_leaf: np.int32 = 30,
         min_information_gain: np.float32 = 1e-4,
-        max_leaf_nodes: np.int32 = 10
+        max_leaf_nodes: np.int32 = 10,
     ):
         self.split_metric = split_metric
         self.split_type = split_type
@@ -59,6 +54,8 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         self._recursive_max_depth = 0
         self._recursive_max_leaf_nodes = 0
         self._recursive_min_information_gain = 0.0
+        self.dset_validator = DatasetValidation()
+        self.param_validator = ParameterValidator()
 
     def _compute_class_probability (self, X: np.ndarray) -> np.ndarray:
         """
@@ -130,6 +127,16 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
                 yield feature_index, feature_percentile_range
 
+    def _split_data (self, X: np.ndarray):
+        for feat_index, percentile_threshold in self._generate_thresholds(X):
+            group_below_threshold = X[:, feat_index] < percentile_threshold
+            group_above_threshold = X[:, feat_index] > percentile_threshold
+
+            filtered_below_threshold = X[:, feat_index][group_below_threshold]
+            filtered_above_threshold = X[:, feat_index][group_above_threshold]
+
+            yield feat_index, percentile_threshold, filtered_below_threshold, filtered_above_threshold
+        
     def _build_decision_tree (self, X: np.ndarray):
         best_computed_information_gain = 0
         best_split_index = 0
@@ -145,21 +152,28 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
                 best_computed_left_split = below_group
                 best_computed_right_split = above_group
 
-            # TODO: Add logic here that will evaluate below and above threshold splits
-            # TODO: information gain and update the tracking variables
+        temp_decision_node = DecisionNode(
+            best_split_index,
+            best_split_condition,
+            None,
+        )
 
         if self._recursive_max_depth == self.max_depth:
-            return "[+] Decision Tree has already reached the max depth"
+            return temp_decision_node
         if self._recursive_max_leaf_nodes == self.max_leaf_nodes:
-            return "[+] Decision Tree has already reached the maximum amount of leaf nodes"
+            return temp_decision_node
         if self._recursive_min_information_gain == self.min_information_gain:
-            return "[+] Decision Tree has already the minimum acceptable information gain"
+            return temp_decision_node
         
         self.left_node = self._build_decision_tree(best_computed_left_split)
         self.right_node = self._build_decision_tree(best_computed_right_split)
 
+        return temp_decision_node
+
     def fit (self, X: np.ndarray):
-        self._build_decision_tree(X)
+        self.dset_validator.validate_existence(X)
+        self.dset_validator.validate_types(X)
+        tree_node = self._build_decision_tree(X)
 
     def predict (self, X: np.ndarray):
         pass
