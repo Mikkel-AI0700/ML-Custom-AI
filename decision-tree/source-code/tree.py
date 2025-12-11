@@ -13,6 +13,7 @@ class DecisionNode:
         split_feat_cat_condition: Union[int, str],
         information_gain: float
     ):
+        self.node_is_decision = False
         self.feat_index = split_feat_index
         self.feat_num_condition = split_feat_num_condition
         self.feat_cat_condition = split_feat_cat_condition
@@ -22,6 +23,7 @@ class DecisionNode:
 
 class LeafNode:
     def __init__ (self, computed_probabilities: np.ndarray):
+        self.node_is_leaf = False
         self.tree_computed_probabilities = computed_probabilities
 
     def compute_argmax (self):
@@ -51,6 +53,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         self.min_samples_leaf = min_samples_leaf
         self.min_information_gain = min_information_gain
         self.max_leaf_nodes = max_leaf_nodes
+        self._root_node: Union[DecisionNode, LeafNode] = None
         self._recursive_max_depth = 0
         self._recursive_max_leaf_nodes = 0
         self._recursive_min_information_gain = 0.0
@@ -137,6 +140,13 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
 
             yield feat_index, percentile_threshold, filtered_below_threshold, filtered_above_threshold
         
+    def _inference_traversal_tree (self, X: np.ndarray, root_node: DecisionNode):
+        for test_data in X:
+            if root_node.feat_num_condition < test_data:
+                return self._inference_traversal_tree(root_node.left_node)
+            if root_node.feat_num_condition > test_data:
+                return self._inference_traversal_tree(root_node.right_node)
+
     def _build_decision_tree (self, X: np.ndarray):
         best_computed_information_gain = 0
         best_split_index = 0
@@ -158,22 +168,37 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             None,
         )
 
-        if self._recursive_max_depth == self.max_depth:
-            return temp_decision_node
-        if self._recursive_max_leaf_nodes == self.max_leaf_nodes:
-            return temp_decision_node
-        if self._recursive_min_information_gain == self.min_information_gain:
-            return temp_decision_node
+        temp_leaf_node = LeafNode(
+            self._compute_class_probability(np.asarray(np.concat((
+                best_computed_left_split,
+                best_computed_right_split
+            ))))
+        )
+
+        if (self._recursive_max_depth == self.max_depth or
+            self._recursive_max_leaf_nodes == self.max_leaf_nodes or
+            self._recursive_min_information_gain > self.min_information_gain
+        ):
+            temp_leaf_node.node_is_leaf = True
+            return temp_leaf_node.compute_argmax()
         
-        self.left_node = self._build_decision_tree(best_computed_left_split)
-        self.right_node = self._build_decision_tree(best_computed_right_split)
+        self._recursive_max_depth += 1
+
+        temp_decision_node.left_node = self._build_decision_tree(best_computed_left_split)
+        temp_decision_node.right_node = self._build_decision_tree(best_computed_right_split)
 
         return temp_decision_node
-
+    
     def fit (self, X: np.ndarray):
         self.dset_validator.validate_existence(X)
         self.dset_validator.validate_types(X)
-        tree_node = self._build_decision_tree(X)
+        self._root_node = self._build_decision_tree(X)
 
     def predict (self, X: np.ndarray):
-        pass
+        inferenced_elements_array = []
+        while not self._root_node.node_is_leaf:
+            predicted_sample = self._inference_traversal_tree(X, self._root_node)
+            inferenced_elements_array.append(predicted_sample)
+
+        # TODO: Fix the logic where it will just get the highest argmax value of the stored
+        # TODO: class probabilities
