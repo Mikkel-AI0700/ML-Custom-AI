@@ -57,8 +57,8 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         self._recursive_max_depth = 0
         self._recursive_max_leaf_nodes = 0
         self._recursive_min_information_gain = 0.0
-        self.dset_validator = DatasetValidation()
-        self.param_validator = ParameterValidator()
+        self._dset_validator = DatasetValidation()
+        self._param_validator = ParameterValidator()
 
     def _compute_class_probability (self, X: np.ndarray) -> np.ndarray:
         """
@@ -90,13 +90,14 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         return log_loss
     
     def _compute_information_gain (self, X: np.ndarray, left_subset: np.ndarray, right_subset: np.ndarray):
+        main_data_impurity = self._evaluate_split_type(X)
         left_subset_impurity = self._evaluate_split_type(left_subset)
         right_subset_impurity = self._evaluate_split_type(right_subset)
 
         left_subset_weighted = len(left_subset) / len(X) * left_subset_impurity
         right_subset_weighted = len(right_subset) / len(X) * right_subset_impurity
         
-        return left_subset_weighted + right_subset_weighted
+        return main_data_impurity - (left_subset_weighted + right_subset_weighted)
     
     def _evaluate_split_type (self, X: np.ndarray):
         if self.split_metric == "gini":
@@ -135,17 +136,19 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             group_below_threshold = X[:, feat_index] < percentile_threshold
             group_above_threshold = X[:, feat_index] > percentile_threshold
 
-            filtered_below_threshold = X[:, feat_index][group_below_threshold]
-            filtered_above_threshold = X[:, feat_index][group_above_threshold]
+            filtered_below_threshold = X[group_below_threshold]
+            filtered_above_threshold = X[group_above_threshold]
 
             yield feat_index, percentile_threshold, filtered_below_threshold, filtered_above_threshold
         
-    def _inference_traversal_tree (self, X: np.ndarray, root_node: DecisionNode):
-        for test_data in X:
-            if root_node.feat_num_condition < test_data:
-                return self._inference_traversal_tree(root_node.left_node)
-            if root_node.feat_num_condition > test_data:
-                return self._inference_traversal_tree(root_node.right_node)
+    def _inference_traversal_tree (self, X: np.ndarray, root_node: Union[DecisionNode, LeafNode]):
+        if root_node.node_is_leaf:
+            return True, root_node.compute_argmax()
+
+        if root_node.feat_num_condition < X:
+            return self._inference_traversal_tree(X, root_node.left_node)
+        else:
+            return self._inference_traversal_tree(X, root_node.right_node)
 
     def _build_decision_tree (self, X: np.ndarray):
         best_computed_information_gain = 0
@@ -168,37 +171,40 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             None,
         )
 
-        temp_leaf_node = LeafNode(
-            self._compute_class_probability(np.asarray(np.concat((
-                best_computed_left_split,
-                best_computed_right_split
-            ))))
-        )
+        # TODO: The LeafNode object instantiation is a logic error
+        # TODO: Reason: Instantiation happens after each iteration prematurely.
+        # TODO: Fix the leaf node class instantiation and stop it from instantiating prematurely
 
         if (self._recursive_max_depth == self.max_depth or
             self._recursive_max_leaf_nodes == self.max_leaf_nodes or
             self._recursive_min_information_gain > self.min_information_gain
         ):
+            temp_leaf_node = LeafNode(
+                self._compute_class_probability(np.asarray(np.concat((
+                    best_computed_left_split,
+                    best_computed_right_split
+                ))))
+            )
+
             temp_leaf_node.node_is_leaf = True
-            return temp_leaf_node.compute_argmax()
+            return temp_leaf_node
         
         self._recursive_max_depth += 1
 
         temp_decision_node.left_node = self._build_decision_tree(best_computed_left_split)
         temp_decision_node.right_node = self._build_decision_tree(best_computed_right_split)
-
-        return temp_decision_node
     
     def fit (self, X: np.ndarray):
-        self.dset_validator.validate_existence(X)
-        self.dset_validator.validate_types(X)
+        self._dset_validator.validate_existence(X)
+        self._dset_validator.validate_types(X)
         self._root_node = self._build_decision_tree(X)
 
     def predict (self, X: np.ndarray):
         inferenced_elements_array = []
-        while not self._root_node.node_is_leaf:
-            predicted_sample = self._inference_traversal_tree(X, self._root_node)
-            inferenced_elements_array.append(predicted_sample)
-
+        for data in np.nditer(X):
+            leaf_node, prediction_probability_array = self._inference_traversal_tree(data, self._root_node)
+            if leaf_node:
+                inferenced_elements_array.append(np.argmax(prediction_probability_array))
+            
         # TODO: Fix the logic where it will just get the highest argmax value of the stored
         # TODO: class probabilities
