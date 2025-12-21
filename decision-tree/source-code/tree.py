@@ -20,6 +20,8 @@ class DecisionNode:
         self.information_gain = information_gain
         self.left_node = None
         self.right_node = None
+        self._left_node_depth = 0
+        self._right_node_depth = 0
 
 class LeafNode:
     def __init__ (self, computed_probabilities: np.ndarray):
@@ -150,7 +152,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         else:
             return self._inference_traversal_tree(X, root_node.right_node)
 
-    def _build_decision_tree (self, X: np.ndarray):
+    def _build_decision_tree (self, X: np.ndarray, computing_left = False, computing_right = False):
         best_computed_information_gain = 0
         best_split_index = 0
         best_split_condition = 0
@@ -171,28 +173,21 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             None,
         )
 
-        # TODO: The LeafNode object instantiation is a logic error
-        # TODO: Reason: Instantiation happens after each iteration prematurely.
-        # TODO: Fix the leaf node class instantiation and stop it from instantiating prematurely
-
         if (self._recursive_max_depth == self.max_depth or
             self._recursive_max_leaf_nodes == self.max_leaf_nodes or
             self._recursive_min_information_gain > self.min_information_gain
         ):
-            temp_leaf_node = LeafNode(
-                self._compute_class_probability(np.asarray(np.concat((
-                    best_computed_left_split,
-                    best_computed_right_split
-                ))))
-            )
-
-            temp_leaf_node.node_is_leaf = True
-            return temp_leaf_node
+            if computing_left:
+                self._left_node_depth = self._left_node_depth + 1
+                return LeafNode(self._compute_class_probability(np.asarray(best_computed_left_split)))
+            if computing_right:
+                self._right_node_depth = self._right_node_depth + 1
+                return LeafNode(self._compute_class_probability(np.asarray(best_computed_right_split)))
         
-        self._recursive_max_depth += 1
+        temp_decision_node.left_node = self._build_decision_tree(best_computed_left_split, computing_left=True)
+        temp_decision_node.right_node = self._build_decision_tree(best_computed_right_split, computing_right=True)
 
-        temp_decision_node.left_node = self._build_decision_tree(best_computed_left_split)
-        temp_decision_node.right_node = self._build_decision_tree(best_computed_right_split)
+        return temp_decision_node
     
     def fit (self, X: np.ndarray):
         self._dset_validator.validate_existence(X)
@@ -206,5 +201,9 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             if leaf_node:
                 inferenced_elements_array.append(np.argmax(prediction_probability_array))
             
+        return np.asarray(inferenced_elements_array)
         # TODO: Fix the logic where it will just get the highest argmax value of the stored
         # TODO: class probabilities
+
+def main ():
+    pass
