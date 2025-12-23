@@ -20,12 +20,11 @@ class DecisionNode:
         self.information_gain = information_gain
         self.left_node = None
         self.right_node = None
-        self._left_node_depth = 0
-        self._right_node_depth = 0
 
 class LeafNode:
     def __init__ (self, computed_probabilities: np.ndarray):
-        self.node_is_leaf = False
+        self._node_is_leaf = False
+        self._leaf_node_amount = 0
         self.tree_computed_probabilities = computed_probabilities
 
     def compute_argmax (self):
@@ -36,8 +35,9 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         "split_metric": (str),
         "split_type": (str),
         "min_samples_leaf": (np.int32),
-        "min_information_gain": (np.float32),
-        "max_leaf_nodes": (np.int32)
+        "min_samples_split": (np.int32),
+        "max_leaf_nodes": (np.int32),
+        "min_information_gain": (np.float32)
     }
 
     def __init__ (
@@ -45,16 +45,20 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         split_metric: str = "gini",
         split_type: str = None,
         max_depth: np.int32 = 10,
-        min_samples_leaf: np.int32 = 30,
-        min_information_gain: np.float32 = 1e-4,
         max_leaf_nodes: np.int32 = 10,
+        min_samples_leaf: np.int32 = 30,
+        min_samples_split: np.int32 = 10,
+        min_information_gain: np.float32 = 1e-4,
+        random_state: int = 42
     ):
         self.split_metric = split_metric
         self.split_type = split_type
         self.max_depth = max_depth
-        self.min_samples_leaf = min_samples_leaf
-        self.min_information_gain = min_information_gain
         self.max_leaf_nodes = max_leaf_nodes
+        self.min_samples_leaf = min_samples_leaf
+        self.min_samples_split = min_samples_split
+        self.min_information_gain = min_information_gain
+        self.random_state = random_state
         self._root_node: Union[DecisionNode, LeafNode] = None
         self._recursive_max_depth = 0
         self._recursive_max_leaf_nodes = 0
@@ -74,7 +78,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         """
         _, label_count = np.unique(X[:, -1], return_counts=True)
         total_lable_count = len(X[:, -1])
-        return [label_count[index] / total_lable_count for index in range(len(label_count))]
+        return np.asarray([label_count[index] / total_lable_count for index in range(len(label_count))])
     
     def _compute_impurity (self, X: np.ndarray) -> np.float32:
         unique_probabilities = self._compute_class_probability(X[:, -1])
@@ -142,22 +146,42 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             filtered_above_threshold = X[group_above_threshold]
 
             yield feat_index, percentile_threshold, filtered_below_threshold, filtered_above_threshold
-        
-    def _inference_traversal_tree (self, X: np.ndarray, root_node: Union[DecisionNode, LeafNode]):
-        if root_node.node_is_leaf:
-            return True, root_node.compute_argmax()
 
-        if root_node.feat_num_condition < X:
-            return self._inference_traversal_tree(X, root_node.left_node)
-        else:
-            return self._inference_traversal_tree(X, root_node.right_node)
+    def _create_node (
+        self, 
+        split_index: int,
+        split_num_condition: Union[int, float],
+        split_cat_condition: Union[int, float],
+        information_gain: float,
+        computed_class_probabilities: np.ndarray,
+        create_decision_node: bool = False,
+        create_leaf_node: bool = False,
+    ) -> Union[DecisionNode, LeafNode]:
+        if create_decision_node:
+            instantiated_decision_node = DecisionNode(
+                split_feat_index=split_index,
+                split_feat_num_condition=split_num_condition,
+                split_feat_cat_condition=None,
+                information_gain=information_gain
+            )
+            return instantiated_decision_node
 
-    def _build_decision_tree (self, X: np.ndarray, computing_left = False, computing_right = False):
+        if create_leaf_node:
+            instantiated_leaf_node = LeafNode(computed_class_probabilities)
+            instantiated_leaf_node._leaf_node_amount = instantiated_leaf_node._leaf_node_amount + 1
+            instantiated_leaf_node._node_is_leaf = True
+            return instantiated_leaf_node
+
+    def _build_decision_tree (self, X: np.ndarray, recursive_tree_depth: int = 1):
         best_computed_information_gain = 0
         best_split_index = 0
         best_split_condition = 0
         best_computed_left_split = None
         best_computed_right_split = None
+
+        if recursive_tree_depth == self.max_depth or len(X) <= self.min_samples_split:
+            leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            return leaf_node          
 
         for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
             computed_information_gain = self._compute_information_gain(X, below_group, above_group)
@@ -167,28 +191,35 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
                 best_computed_left_split = below_group
                 best_computed_right_split = above_group
 
-        temp_decision_node = DecisionNode(
-            best_split_index,
-            best_split_condition,
-            None,
+            # TODO: Add logic that checks if the information gain after the loop has finished
+            # TODO: is still the same as the previous iteration
+
+        if len(np.concatenate((best_computed_left_split, best_computed_right_split), axis=1)) <= self.min_samples_leaf:
+            leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            return leaf_node
+
+        instantiated_decision_node = self._create_node(
+            split_index=best_split_index,
+            split_num_condition=best_split_condition,
+            split_cat_condition=None,
+            information_gain=best_computed_information_gain,
+            create_decision_node=True
         )
 
-        if (self._recursive_max_depth == self.max_depth or
-            self._recursive_max_leaf_nodes == self.max_leaf_nodes or
-            self._recursive_min_information_gain > self.min_information_gain
-        ):
-            if computing_left:
-                self._left_node_depth = self._left_node_depth + 1
-                return LeafNode(self._compute_class_probability(np.asarray(best_computed_left_split)))
-            if computing_right:
-                self._right_node_depth = self._right_node_depth + 1
-                return LeafNode(self._compute_class_probability(np.asarray(best_computed_right_split)))
-        
-        temp_decision_node.left_node = self._build_decision_tree(best_computed_left_split, computing_left=True)
-        temp_decision_node.right_node = self._build_decision_tree(best_computed_right_split, computing_right=True)
+        instantiated_decision_node.left_node = self._build_decision_tree(best_computed_left_split, recursive_tree_depth + 1)
+        instantiated_decision_node.right_node = self._build_decision_tree(best_computed_right_split, recursive_tree_depth + 1)
 
-        return temp_decision_node
-    
+        return instantiated_decision_node
+
+    def _inference_traversal_tree (self, X: np.ndarray, root_node: Union[DecisionNode, LeafNode]):
+        if root_node._node_is_leaf:
+            return True, root_node.compute_argmax()
+
+        if root_node.feat_num_condition < X:
+            return self._inference_traversal_tree(X, root_node.left_node)
+        else:
+            return self._inference_traversal_tree(X, root_node.right_node)
+
     def fit (self, X: np.ndarray):
         self._dset_validator.validate_existence(X)
         self._dset_validator.validate_types(X)
@@ -206,4 +237,4 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         # TODO: class probabilities
 
 def main ():
-    pass
+    tree_instance = DecisionTreeClassifier()
