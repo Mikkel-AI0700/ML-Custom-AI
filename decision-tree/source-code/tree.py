@@ -176,12 +176,13 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         best_computed_information_gain = 0
         best_split_index = 0
         best_split_condition = 0
-        best_computed_left_split = None
-        best_computed_right_split = None
+        best_computed_left_split: np.ndarray = None
+        best_computed_right_split: np.ndarray = None
 
+        # Tree depth & min_samples_split hyperparameter check
         if recursive_tree_depth == self.max_depth or len(X) <= self.min_samples_split:
             leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
-            return leaf_node          
+            return leaf_node
 
         for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
             computed_information_gain = self._compute_information_gain(X, below_group, above_group)
@@ -191,12 +192,17 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
                 best_computed_left_split = below_group
                 best_computed_right_split = above_group
 
-            # TODO: Add logic that checks if the information gain after the loop has finished
-            # TODO: is still the same as the previous iteration
+        # min_information_gain hyperparameter check
+        if best_computed_information_gain < self.min_information_gain:
+            instantiated_leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            return instantiated_decision_node
 
-        if len(np.concatenate((best_computed_left_split, best_computed_right_split), axis=1)) <= self.min_samples_leaf:
-            leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
-            return leaf_node
+        # min_samples_leaf hyperparameter check
+        if (best_computed_left_split.shape[0] < self.min_samples_leaf or
+            best_computed_right_split.shape[0] < self.min_samples_leaf
+        ):
+            instantiated_leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            return instantiated_leaf_node
 
         instantiated_decision_node = self._create_node(
             split_index=best_split_index,
