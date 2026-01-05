@@ -2,34 +2,44 @@
 
 # Global constants
 PYTHON_TLD=$(pwd)
-LIN_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/linear-regression/source-file/lin-reg-new.py"
-LOG_REG_SOURCE="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai/logistic-regression/source-files/log-reg-new.py"
 
+# Generator compiler paths
+DATASET_GENERATOR_VENV="${PYTHON_TLD}/python-utilities/generator-venv"
+DATASET_GENERATOR_PATH="${PYTHON_TLD}/python-utilities/generator-files/generator.py"
+
+# Machine learning algorithms path
 LIN_REG_SOURCE="${PYTHON_TLD}/linear-regression/source-file/lin-reg-new.py"
 LOG_REG_SOURCE="${PYTHON_TLD}/logistic-regression/source-files/log-reg-new.py"
+TREE_SOURCE=""
 
-tld_passed=0
-venv_passed=0
+# Global Top Level Domain and VENV checks
+main_tld_passed=0
+main_venv_passed=0
 
-function check_tld () {
-    if [[ "${PYTHONPATH}" == "${PYTHON_TLD}" ]] ; then
-        echo "[+] Python TLD is set"
-        tld_passed=1
+function check_tld_venv () {
+    if [[ ${main_tld_passed} -eq 1 && ${main_venv_passed} -eq 1 ]]; then
+        echo "[+] PYTHON_TLD and VIRTUAL ENVIRONMENT IS SET"
     else
-        echo "[-] Error: Python TLD is not set. Setting now"
-        export PYTHONPATH=${PYTHON_TLD} && echo "[+] Python TLD set: ${PYTHON_TLD}"
-        check_tld
+        { export PYTHON_TLD="${PYTHON_TLD}" && echo "[+] PYTHON_TLD is now set!" && main_tld_passed=1 } || { echo "[-] Unable to set PYTHON_TLD" && exit 1 }
+        { source "main-venv/bin/activte" && echo "[+] VENV is now set!" && main_venv_passed=1 } || { echo "[-] Unable to set VENV" && exit 1 }
+        check_tld_venv
     fi
 }
 
-function check_venv () {
-    if [[ -n "$VIRTUAL_ENV" ]] ; then
-        echo "[+] Python virtual environment is set"
-        venv_passed=1
-    else
-        echo "[-] Error: Python virtual environment isn't set. Setting now"
-        source main-venv/bin/activate && echo "[+] Environment set: ${VIRTUAL_ENV}"
-        check_venv
+function generate_datasets () {
+    local algorithm_type="$1"
+    local key_value_change="$2"
+
+    if [[ ${gen_tld_passed} -eq 1 && ${gen_venv_passed} -eq 1 ]]; then
+        if [[ "${algorithm_type}" == "regression" ]]; then
+            ;
+        elif [[ "${algorithm_type}" == "classification" ]]; then
+            ;
+        elif [[ "${algorithm_type}" == "clustering" ]]; then
+            ;
+        else
+            ;
+        fi
     fi
 }
 
@@ -37,15 +47,16 @@ function main () {
   check_tld
   check_venv
 
-  if [[ ${tld_passed} -eq 1 && ${venv_passed} -eq 1 ]] ; then
-      echo "[+] TLD and VENV set. Running: $1"
-      if [[ $1 == "linreg" ]] ; then
-          echo "[+] Running Linear Regression model"
-          python3 ${LIN_REG_SOURCE}
-      elif [[ "$1" == "logreg" ]] ; then
-          python3 ${LOG_REG_SOURCE}
-      fi
-  fi
+    if [[ ${tld_passed} -eq 1 && ${venv_passed} -eq 1 ]] ; then
+        echo "[+] TLD and VENV set. Running: $1"
+        if [[ $1 == "linreg" ]] ; then
+            echo "[+] Running Linear Regression model"
+            python3 ${LIN_REG_SOURCE}
+        elif [[ "$1" == "logreg" ]] ; then
+            python3 ${LOG_REG_SOURCE}
+        elif [[ "$1" == "tree" ]]; then
+        fi
+    fi
 }
 
 main $1
