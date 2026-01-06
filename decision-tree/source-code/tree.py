@@ -31,6 +31,23 @@ class LeafNode:
         return np.argmax(self.tree_computed_probabilities)
 
 class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierMixin):
+    """
+    DecisionTreeClassifier class uses the concept of a greedy algorithm to search
+    from top to bottom what best separates all the unique classes in the dataset
+
+    Parameters:
+        split_metric (str): The splitting criteria using Information Theory when computing the impurity or randomness of the classes
+        split_type (str): Controls how much features to be used after splitting
+        max_depth (int): The maximum allowable depth of recursively created subtrees
+        max_leaf_nodes (int): The maximum allowable amount of created leaf nodes in the tree
+        min_samples_leaf (int): The minimum allowable amount of samples needed inside a node to convert to leaf
+        min_samples_split (int): The minimum allowable amount of samples needed inside a node to split
+        min_information_gain (float): The minimum allowable information gain per iteration. If below, will convert to leaf node.
+        random_state (int): Controls computer's randomness. Ensures reproducibility
+
+    Returns:
+        DecisionTreeClassifier (object): The instantiated DecisionTreeClassifier
+    """
     __parameter_constraints__ = {
         "split_metric": (str),
         "split_type": (str),
@@ -81,21 +98,63 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         return np.asarray([label_count[index] / total_lable_count for index in range(len(label_count))])
     
     def _compute_impurity (self, X: np.ndarray) -> np.float32:
+        """
+        Computes the gini impurity using the formula: Gini = 1 - Σ(pᵢ²)
+
+        Parameters:
+            X (np.ndarray): The entire or subset of the dataset to compute the impurity on
+
+        Returns:
+            computed_impurity (np.float32): The floating point computed gini impurity
+        """
         unique_probabilities = self._compute_class_probability(X[:, -1])
         computed_impurity = 1 - np.sum(np.square(unique_probabilities))
         return computed_impurity
     
     def _compute_entropy (self, X: np.ndarray) -> np.float32:
+        """
+        Computed the entropy randomness using the formula: H(X) = -Σ p(xᵢ) log₂(p(xᵢ))
+
+        Parameters:
+            X (np.ndarray): THe entire or subset of the dataset to compute the impurity on
+
+        Returns:
+            computed_entropy (np.float32): The floating point computed gini impurity
+        """
         unique_probabilities = self._compute_class_probability(X[:, -1])
         computed_entropy = -(np.sum(unique_probabilities * np.log2(unique_probabilities)))
         return computed_entropy
     
     def _compute_log_loss (self, Y_true: np.ndarray, Y_probabilities: np.ndarray) -> np.float32:
+        """
+        Computed the log loss
+
+        Parameters:
+            Y_true (np.ndarray): The ground truths from the dataset
+            Y_probabilities (np.ndarray): The computed probabilities of the specific class
+
+        Returns:
+            log_loss (np.float32): The floating point computed log loss
+
+        Warning:
+            _comnpute_log_loss still remains unstable and not yet supported.
+        """
         log_loss_eq = (Y_true * np.log(Y_probabilities)) + (1 - Y_true) * np.log(1 - Y_probabilities)
         log_loss = 1 / len(Y_probabilities) * np.sum(log_loss_eq)
         return log_loss
     
     def _compute_information_gain (self, X: np.ndarray, left_subset: np.ndarray, right_subset: np.ndarray):
+        """
+        Computes the information gain using the formula: Gain(S, A) = Entropy(S) - Σ ( |Sv| / |S| ) * Entropy(Sv)
+
+        Parameters:
+            X (np.ndarray): The entire dataset to be used for computing the information gain
+            left_subset (np.ndarray): The best subset of data with the best information gain in the left node
+            right_subset (np.ndarray): The best subset of data with the best information gain in the right node
+
+        Returns:
+            information_gain (np.float32): The floating point computed information gain
+        """
         main_data_impurity = self._evaluate_split_type(X)
         left_subset_impurity = self._evaluate_split_type(left_subset)
         right_subset_impurity = self._evaluate_split_type(right_subset)
@@ -106,6 +165,15 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         return main_data_impurity - (left_subset_weighted + right_subset_weighted)
     
     def _evaluate_split_type (self, X: np.ndarray):
+        """
+        Will evaluate the type of splitting metric type on the entire or just a subset of the dataset
+
+        Parameters:
+            X (np.ndarray): The entire of the just the subset of the dataset to be used for computing
+
+        Returns:
+            metric_score (np.float32): Coming from _compute_impurity and _compute_entropy, will return np.float32 score
+        """
         if self.split_metric == "gini":
             return self._compute_impurity(X)
         elif self.split_metric == "entropy":
@@ -114,6 +182,15 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             return self._compute_log_loss() # WARNING: Very volatile code. Don't be stupid and run this line ;)
     
     def _determine_split_type (self, X: np.ndarray) -> np.ndarray:
+        """
+        Splits N amount of features depending on what split metric will be used
+
+        Parameters:
+            X (np.ndarray): The entire dataset to be splitted by N features
+
+        Returns:
+            feature_indices (np.ndarray): The list of feature indices to be used when generating thresholds
+        """
         feature_indices_range = list(range(X.shape[1] - 1))
 
         if self.split_metric == "sqrt":
@@ -132,12 +209,35 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         return feature_indices
         
     def _generate_thresholds (self, X: np.ndarray):
+        """
+        Splits and yields the data based on percentile thresholds
+
+        Parameters:
+            X (np.ndarray): The entire or just the subset of the dataset to be splitted
+
+        Yields:
+            feature_index (int): The current iterated feature index
+            feature_percentile_range (np.ndarray): Values that fall under certain percentile range
+        """
         feature_indices = self._determine_split_type(X)
         for feature_index in feature_indices:
             for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
                 yield feature_index, feature_percentile_range
 
     def _split_data (self, X: np.ndarray):
+        """
+        Will iterate using the yielded values from _generate_thresholds, then split it
+        into two groups: below the threshold and above the threshold
+
+        Parameters:
+            X (np.ndarray): The entire or just the subset of the dataset to be splitted
+
+        Yields:
+            feat_index (int): The current iterated feature index
+            percentile_threshold (list[ints]): The current percentile in the iteration
+            filtered_below_threshold (np.ndarray): The ndarray containing all the values that fall under the percentile threshold
+            filtered_above_threhsold (np.ndarray): The ndarray containing all the values that is above the percentile threhsold
+        """
         for feat_index, percentile_threshold in self._generate_thresholds(X):
             group_below_threshold = X[:, feat_index] < percentile_threshold
             group_above_threshold = X[:, feat_index] > percentile_threshold
@@ -157,6 +257,22 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         create_decision_node: bool = False,
         create_leaf_node: bool = False,
     ) -> Union[DecisionNode, LeafNode]:
+        """
+        Will either create and return a DecisionNode or LeafNode, depending on the 
+        status of the recursive tree builder function
+
+        Parameters:
+            split_index (int): Split index unique to the iteration
+            split_num_condition (Union[int, float]): The numerical condition that splitted the data unique to the iteration
+            split_cat_condition (Union[int, float]): The categorical conditoon that splitted the data unique to that iteration
+            information_gain (float): The best computed information gain unique to that iteration
+            computed_class_probabilities (np.ndarray): The computed class probabilities when node reaches a certain level
+            create_decision_node (bool): Boolean flag to check that signals a DecisionNode creation
+            create_leaf_node (bool): Boolean flag to check that signals a LeafNode creation
+
+        Returns:
+            instantiated_node (Union[DecisionNode, LeafNode]): The instantiated object of either the DecisionNode or LeafNode
+        """
         if create_decision_node:
             instantiated_decision_node = DecisionNode(
                 split_feat_index=split_index,
@@ -173,6 +289,17 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             return instantiated_leaf_node
 
     def _build_decision_tree (self, X: np.ndarray, recursive_tree_depth: int = 1):
+        """
+        The main recursive tree builder function that recursively builds the main decision tree
+        by building the left and right subtrees
+
+        Parameters:
+            X (np.ndarray): The entire or just the subset of the dataset that will be used when training
+            recursive_tree_depth (int): Internal tracking variable. Used to track the depth of the corresponding subtree
+
+        Returns:
+            (Union[DecisionNode, LeafNode]): Returns DecisionNode if no stopping criteria is met, else returns LeafNode
+        """
         best_computed_information_gain = 0
         best_split_index = 0
         best_split_condition = 0
@@ -185,6 +312,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             return leaf_node
 
         for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
+            # TODO: Add logic that will check if the decision tree is running for the first time
             computed_information_gain = self._compute_information_gain(X, below_group, above_group)
             if computed_information_gain > best_computed_information_gain:
                 best_split_index = feat_index
@@ -218,6 +346,15 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         return instantiated_decision_node
 
     def _inference_traversal_tree (self, X: np.ndarray, root_node: Union[DecisionNode, LeafNode]):
+        """
+        Inferences a single data point by traversing the tree until it reaches a leaf node
+
+        Parameters:
+            X (np.ndarray): A single datapoint to be inferenced
+
+        Returns:
+            (list[np.float32]): Computed class probabilities inside leaf node
+        """
         if root_node._node_is_leaf:
             return True, root_node.compute_argmax()
 
@@ -227,11 +364,30 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             return self._inference_traversal_tree(X, root_node.right_node)
 
     def fit (self, X: np.ndarray):
+        """
+        Train the entire DecisionTreeClassifier using the entire dataset
+
+        Parameters:
+            X (np.ndarray): The entire dataset to be used for training
+
+        Returns:
+            None
+        """
         self._dset_validator.validate_existence(X)
         self._dset_validator.validate_types(X)
         self._root_node = self._build_decision_tree(X)
 
     def predict (self, X: np.ndarray):
+        """
+        Loops over the data samples then returns the class probability
+        that corresponds to the predicted class
+
+        Parameters:
+            X (np.ndarray): The entire dataset to be used for inference
+
+        Returns:
+            inferenced_elements_array (np.ndarray): Contains the predicted elements using the stored class probabilities
+        """
         inferenced_elements_array = []
         for data in np.nditer(X):
             leaf_node, prediction_probability_array = self._inference_traversal_tree(data, self._root_node)
