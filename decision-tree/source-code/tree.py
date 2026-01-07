@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 from validator.validator import DatasetValidation
 from validator import ParameterValidator
-from base.EstimatorClass import BaseEstimator, ClassifierMixin
+from base.BaseEstimator import BaseEstimator
+from base.ClassifierMixin import ClassifierMixin
 
 class DecisionNode:
     def __init__ (
