@@ -153,6 +153,15 @@ class LogisticRegression:
             self._update_bias(computed_bias)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
+        """
+        Taking in a np.ndarray of test samples then inferencing them using: Xw + b
+
+        Parameters:
+            test_x (Union[np.ndarray | pd.DataFrame]): The dataset that will be inferenced
+
+        Returns:
+            predictions (np.ndarray): The inferenced elements
+        """
         if self.validator.validate_existence([test_x]):
             pass
         if isinstance(test_x, pd.DataFrame):
