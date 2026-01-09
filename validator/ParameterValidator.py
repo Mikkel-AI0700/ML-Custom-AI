@@ -42,7 +42,7 @@ class ParameterValidator:
                 maximum_threshold = parameter_constraint.get("max_threshold", None)
                 choices_selection = parameter_constraint.get("choices", None)
 
-                if parameter_constraint == "int" or parameter_constraint == "float";
+                if parameter_constraint == "int" or parameter_constraint == "float":
                     if parameter > maximum_threshold:
                         raise OutOfBoundsException(
                             self.oob_exception_message.format(parameter, constraint_type, maximum_threshold)
