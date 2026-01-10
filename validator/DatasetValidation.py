@@ -3,7 +3,7 @@ from inspect import signature
 import numpy as np
 import pandas as pd
 from errors.DatasetErrors import (
-    NonExistentDatasets,
+    NonExistentDataset,
     UnequalShapesException,
     UnequalDatatypesException,
     InfinityException,
@@ -38,8 +38,8 @@ class DatasetValidation:
         try:
             map(self.__check_non, X)
             if len(self.datasets_with_non) > 0:
-                raise NonExistentDatasets(self.datasets_with_non)
-        except NonExistentDatasets as ned_message:
+                raise NonExistentDataset(self.datasets_with_non)
+        except NonExistentDataset as ned_message:
             print(ned_message)
             exit(EXIT_FAILURE)
 
