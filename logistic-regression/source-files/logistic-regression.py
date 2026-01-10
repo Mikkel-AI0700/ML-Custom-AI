@@ -1,7 +1,10 @@
 from typing import Union
 import numpy as np
 import pandas as pd
-from validator.validator import DatasetValidation, ParameterValidator
+from validator.DatasetValidation import DatasetValidation
+from validator.ParameterValidator import ParameterValidator
+from base.BaseEstimator import BaseEstimator
+from base.ClassifierMixin import ClassifierMixin
 
 # Importing scikit-learn classification metrics
 # It will be removed in the main source files
@@ -34,6 +37,8 @@ class LogisticRegression:
         self.epochs = epochs
         self.learning_rate = learning_rate
         self.fit_intercept = True
+        self._dset_validator = DatasetValidation()
+        self._hyperparameter_validator = ParameterValidator()
         self.validator = DatasetValidation()
 
     def _initialize_weights_bias (self, train_x: np.ndarray):
@@ -137,7 +142,8 @@ class LogisticRegression:
             train_y = train_y.to_numpy()
             print(f"[+] Train y is Pandas, Converted to Numpy -> Rows: {train_y.shape[0]} | Columns: {train_y.shape[1]}")
 
-        self.validator.perform_dataset_validation(train_x, train_y)
+        self._dset_validator.perform_dataset_validation(train_x, train_y)
+        self._hyperparameter_validator.validate_parameters()
         self._initialize_weights_bias(train_x)
 
         for epoch in range(self.epochs):
@@ -162,11 +168,11 @@ class LogisticRegression:
         Returns:
             predictions (np.ndarray): The inferenced elements
         """
-        if self.validator.validate_existence([test_x]):
-            pass
         if isinstance(test_x, pd.DataFrame):
             test_x = test_x.to_numpy()
-            print(f"[+] Train x is Pandas, Converted to Numpy -> Rows: {train_x.shape[0]} | Columns: {train_x.shape[1]}")
+            print(f"[+] Train x is Pandas, Converted to Numpy -> Rows: {test_x.shape[0]} | Columns: {test_x.shape[1]}")
+        if self._dset_validator.perform_dataset_validation(test_x):
+            pass
 
         logit_predictions = np.dot(test_x, self.partial_derivative_m) + self.partial_derivative_b
         squashed_predictions = self._sigmoid_function(logit_predictions)
