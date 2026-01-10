@@ -60,11 +60,12 @@ class Not1DDataset (Exception):
         return self.unequal_1d.format(self.X.shape)
 
 class Not2DDatasete (Exception):
-    def __init__ (self):
-        pass
+    def __init__ (self, X: np.ndarray):
+        self.X = X
+        self.unequal_2d = "[-] Error: Passed dataset is not 1D, convert to 2D. X shape: {}"
 
     def __str__ (self):
-        pass
+        return self.unequal_2d.format(self.X.shape)
 
 class InfinityException (Exception):
     def __init__ (self, infinity_datasets: list):
