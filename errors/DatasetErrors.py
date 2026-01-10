@@ -27,7 +27,7 @@ class UnequalAlignmentException (Exception):
 class UnequalShapesException (Exception):
     def __init__ (self, X: np.ndarray, Y: np.ndarray):
         self.X = X
-        self.Y = X
+        self.Y = Y
         self.use_message = (
             "[-] Error: Unequal shapes of both datasets"
             "X rows: {} | X columns: {}"
@@ -50,6 +50,21 @@ class UnequalDatatypesException (Exception):
 
     def __str__ (self):
         return self.ude_message.format(self.X.dtype, self.Y.dtype)
+    
+class Not1DDataset (Exception):
+    def __init__ (self, X: np.ndarray):
+        self.X = X
+        self.unequal_1d = "[-] Error: Passed dataset is not 1D, convert to 1D. X shape: {}"
+
+    def __str__ (self):
+        return self.unequal_1d.format(self.X.shape)
+
+class Not2DDatasete (Exception):
+    def __init__ (self):
+        pass
+
+    def __str__ (self):
+        pass
 
 class InfinityException (Exception):
     def __init__ (self, infinity_datasets: list):
