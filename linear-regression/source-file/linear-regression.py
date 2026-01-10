@@ -10,19 +10,28 @@ from sklearn.datasets import make_regression
 from sklearn.metrics import mean_squared_error
  
 class LinearRegression:
-    """
-    Supervised machine learning model that models the relationship of the
-    independent and dependent variables
+    """Linear regression trained with (batch) gradient descent.
 
-    Parameters:
-        epochs (int): The amount of iterations that the dataset will go through the model
-        learning_rate (Union[int | float): Controls how much the gradients will be updated. Controls gradient step
-        fit_intercept (bool): Controls whether to include the bias. If no, then model will assume data goes through (0, 0) 
-        
-    Returns:
-        LinearRegression (object): The instantiated LinearRegression object
+    This model learns a linear mapping from features to a continuous target:
+    `y_hat = Xw + b` (if `fit_intercept=True`).
+
+    Attributes:
+        partial_derivative_m (np.ndarray | None): Weight vector (initialized in `fit`).
+        partial_derivative_b (float | None): Bias term (initialized in `fit` if `fit_intercept=True`).
+        epochs (int): Number of training iterations.
+        learning_rate (float): Step size for gradient updates.
+        fit_intercept (bool): Whether to learn an intercept term.
+        validator (DatasetValidation): Dataset validation helper.
     """
+
     def __init__ (self, epoch: int, learning_rate: float = 1e-4, fit_intercept: bool = True):
+        """Initialize the LinearRegression model.
+
+        Args:
+            epoch (int): Number of training iterations.
+            learning_rate (float, optional): Step size for gradient updates. Defaults to 1e-4.
+            fit_intercept (bool, optional): Whether to learn an intercept/bias term. Defaults to True.
+        """
         self.partial_derivative_m = None
         self.partial_derivative_b = None
         self.epochs = epoch
@@ -31,11 +40,10 @@ class LinearRegression:
         self.validator = DatasetValidation()
 
     def _initialize_weights_bias (self, train_x: np.ndarray):
-        """
-        Initializes the weights and bias of the linear regression model
+        """Initialize model weights (and bias if enabled).
 
-        Parameters: 
-            train_x (np.ndarray): The main training dataset to be used for training
+        Args:
+            train_x (np.ndarray): Training feature matrix of shape (n_samples, n_features).
 
         Returns:
             None
@@ -46,51 +54,60 @@ class LinearRegression:
             self.partial_derivative_b = 0.0
 
     def _compute_cost (self, train_y: np.ndarray, pred_y: np.ndarray):
-        """
-        Computing the Mean Squared Error (MSE) error of the linear regression model
+        """Compute the training loss.
 
-        Parameters:
-            train_y (np.ndarray): The training ground truths of the training dataset
-            pred_y (np.ndarray): The initial predictions of the model during training
+        Note:
+            Despite the name, this returns the *sum* of squared errors (SSE),
+            not the mean squared error (MSE).
+
+        Args:
+            train_y (np.ndarray): Ground-truth targets.
+            pred_y (np.ndarray): Model predictions.
 
         Returns:
-            computed_mse (np.float32): The computed MSE error for the model
+            float: Sum of squared errors over all samples.
         """
         return np.sum(np.square(pred_y - train_y))
 
     def _compute_weights_gradient (self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
-        """
-        Computes the required gradients to adjust model's weights using: dw = (1 / m) * sum((y_pred - y) * x)
+        """Compute gradients for the weights.
 
-        Parameters:
-            train_x (np.ndarray): The main training dataset
-            train_y (np.ndarray: The ground truths dataset
-            pred_y (np.ndarray): The ndarray of logits after Xw + b
+        Uses the batch gradient for squared error:
+        `dw = (1 / m) * X^T (y_pred - y)`.
+
+        Args:
+            train_x (np.ndarray): Feature matrix of shape (m, n_features).
+            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
+            pred_y (np.ndarray): Predictions of shape compatible with `train_y`.
 
         Returns:
-            computed_weights_gradients (np.ndarray): A ndarray of computed gradients to update model weights
+            np.ndarray: Weight gradients of shape (n_features,).
         """
         return 1 / len(train_x) * np.dot(train_x.T, (pred_y - train_y))
 
     def _compute_bias_gradients (self, train_y: np.ndarray, pred_y: np.ndarray):
-        """
-        Computes the required bias to adjust the model's bias using: db = (1 / m) * sum(y_pred - y)
+        """Compute gradient for the bias term.
 
-        Parameters:
-            train_y (np.ndarray): The ground truths dataset
-            pred_y (np.ndarray): The ndarray of logits after Xw + b
+        Uses:
+        `db = (1 / m) * sum(y_pred - y)`.
+
+        Args:
+            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
+            pred_y (np.ndarray): Predictions of shape compatible with `train_y`.
 
         Returns:
-            computed_bias_gradient (np.float32): A np.float32 of computed bias to update the model's bias
+            float: Bias gradient.
         """
         return 1 / len(train_y) * np.sum(pred_y - train_y)
 
     def _update_weights_gradient (self, computed_weights_gradients: np.ndarray):
-        """
-        Updates the model's weights using: w = w - (learning_rate * dw)
+        """Apply a gradient update step to the weights.
 
-        Parameters:
-            computed_weights_gradients (np.ndarray): A ndarray containing the computed gradients from _compute_weights_gradients
+        Update rule:
+        `w = w - learning_rate * dw`.
+
+        Args:
+            computed_weights_gradients (np.ndarray): Weight gradients (dw).
 
         Returns:
             None
@@ -98,11 +115,13 @@ class LinearRegression:
         self.partial_derivative_m -= self.learning_rate * computed_weights_gradients
 
     def _update_bias_gradient (self, computed_bias_gradients: np.ndarray):
-        """
-        Updates the model's bias using: b = b - (learning_rate * db)
+        """Apply a gradient update step to the bias.
 
-        Parameters:
-            computed_bias_gradient (float): A single float value containing the computed bias from _compute_bias_gradients
+        Update rule:
+        `b = b - learning_rate * db`.
+
+        Args:
+            computed_bias_gradients (float): Bias gradient (db).
 
         Returns:
             None
@@ -114,12 +133,11 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame],
     ):
-        """
-        Starts training the logistic regression model
+        """Train the model on the provided dataset.
 
-        Parameters:
-            train_x: (Union[np.ndarray | pd.DataFrame]): The main training dataset
-            train_y: (Union[np.ndarray | pd.DataFrame]): The main ground truths dataset
+        Args:
+            train_x (np.ndarray | pd.DataFrame): Training features of shape (n_samples, n_features).
+            train_y (np.ndarray | pd.DataFrame): Training targets of shape (n_samples,) or (n_samples, 1).
 
         Returns:
             None
@@ -148,14 +166,15 @@ class LinearRegression:
             self._update_bias_gradient(computed_bias) 
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
-        """
-        Taking in a np.ndarray of test samples then inferencing them using: Xw + b
+        """Predict targets for the given samples.
 
-        Parameters:
-            test_x (Union[np.ndarray | pd.DataFrame]): The dataset that will be inferenced
+        Computes `Xw + b` using the learned parameters.
+
+        Args:
+            test_x (np.ndarray | pd.DataFrame): Feature matrix of shape (n_samples, n_features).
 
         Returns:
-            predictions (np.ndarray): The inferenced elements
+            np.ndarray: Predicted values.
         """
         if self.validator.validate_existence([test_x]):
             pass
