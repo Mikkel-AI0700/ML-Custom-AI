@@ -13,17 +13,20 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 
 class LogisticRegression:
-    """
-    Machine learning algorithm uses the sigmoid function to turn the logits
-    from the initial Xw + b formula into probabilities
+    """Binary logistic regression trained with (batch) gradient descent.
 
-    Parameters:
-        epochs (int): The amount of iterations that the dataset will go through the model
-        learning_rate (Union[int | float): Controls how much the gradients will be updated. Controls gradient step
-        fit_intercept (bool): Controls whether to include the bias. If no, then model will assume data goes through (0, 0)
+    The model computes linear scores `z = Xw + b`, converts them to probabilities
+    via the sigmoid function, and (in `predict`) thresholds probabilities at 0.5
+    to produce class labels in {0, 1}.
 
-    Returns:
-        LogisticRegression (object): The instantiated LogisticRegression
+    Attributes:
+        partial_derivative_m (np.ndarray | None): Weight vector (initialized in `fit`).
+        partial_derivative_b (float | None): Bias term (initialized in `fit` if `fit_intercept=True`).
+        epochs (int): Number of training iterations.
+        learning_rate (int | float): Step size for gradient updates.
+        fit_intercept (bool): Whether to learn an intercept/bias term.
+        _dset_validator (DatasetValidation): Dataset validation helper.
+        _hyperparameter_validator (ParameterValidator): Hyperparameter validation helper.
     """
     __parameter_constraints__ = {
         "epochs": (int),
@@ -39,15 +42,12 @@ class LogisticRegression:
         self.fit_intercept = True
         self._dset_validator = DatasetValidation()
         self._hyperparameter_validator = ParameterValidator()
-        self.validator = DatasetValidation()
 
-    def _initialize_weights_bias (self, train_x: np.ndarray):
-        """
-        Initializes the weights and bias by counting the features present in
-        the dataset and checking if the fit_intercept hyperparameter is set to true
+    def _initialize_weights_bias(self, train_x: np.ndarray):
+        """Initialize model parameters.
 
-        Parameters:
-            train_x (np.ndarray): The main dataset to be used for training
+        Args:
+            train_x (np.ndarray): Training feature matrix of shape (n_samples, n_features).
 
         Returns:
             None
@@ -57,66 +57,75 @@ class LogisticRegression:
         if self.fit_intercept:
             self.partial_derivative_b = 0.0
 
-    def _compute_weights_gradients (self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
-        """
-        Computes the required gradients to adjust model's weights using: dw = (1 / m) * sum((y_pred - y) * x)
+    def _compute_weights_gradients(self, train_x: np.ndarray, train_y: np.ndarray, pred_y: np.ndarray):
+        """Compute gradients for the weights.
 
-        Parameters:
-            train_x (np.ndarray): The main training dataset
-            train_y (np.ndarray: The ground truths dataset
-            pred_y (np.ndarray): The ndarray of logits after Xw + b
+        Uses the batch gradient:
+        `dw = (1 / m) * X^T (y_pred - y)`.
+
+        Args:
+            train_x (np.ndarray): Feature matrix of shape (m, n_features).
+            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
+            pred_y (np.ndarray): Predicted probabilities of shape compatible with `train_y`.
 
         Returns:
-            computed_weights_gradients (np.ndarray): A ndarray of computed gradients to update model weights
+            np.ndarray: Weight gradients of shape (n_features,).
         """
         return 1 / len(train_x) * np.dot(train_x.T, (pred_y - train_y))
 
-    def _compute_bias_gradients (self, train_y: np.ndarray, pred_y: np.ndarray):
-        """
-        Computes the required bias to adjust the model's bias using: db = (1 / m) * sum(y_pred - y)
+    def _compute_bias_gradients(self, train_y: np.ndarray, pred_y: np.ndarray):
+        """Compute gradient for the bias term.
 
-        Parameters:
-            train_y (np.ndarray): The ground truths dataset
-            pred_y (np.ndarray): The ndarray of logits after Xw + b
+        Uses:
+        `db = (1 / m) * sum(y_pred - y)`.
+
+        Args:
+            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
+            pred_y (np.ndarray): Predicted probabilities of shape compatible with `train_y`.
 
         Returns:
-            computed_bias_gradient (np.float32): A np.float32 of computed bias to update the model's bias
+            float: Bias gradient.
         """
         return 1 / len(train_y) * np.sum(pred_y - train_y)
 
-    def _update_weights (self, computed_weights_gradients: np.ndarray):
-        """
-        Updates the model's weights using: w = w - (learning_rate * dw)
+    def _update_weights(self, computed_weights_gradients: np.ndarray):
+        """Apply a gradient update step to the weights.
 
-        Parameters:
-            computed_weights_gradients (np.ndarray): A ndarray containing the computed gradients from _compute_weights_gradients
+        Update rule:
+        `w = w - learning_rate * dw`.
+
+        Args:
+            computed_weights_gradients (np.ndarray): Weight gradients (dw).
 
         Returns:
             None
         """
         self.partial_derivative_m -= self.learning_rate * computed_weights_gradients
 
-    def _update_bias (self, computed_bias_gradient: float):
-        """
-        Updates the model's bias using: b = b - (learning_rate * db)
+    def _update_bias(self, computed_bias_gradient: float):
+        """Apply a gradient update step to the bias.
 
-        Parameters:
-            computed_bias_gradient (float): A single float value containing the computed bias from _compute_bias_gradients
+        Update rule:
+        `b = b - learning_rate * db`.
+
+        Args:
+            computed_bias_gradient (float): Bias gradient (db).
 
         Returns:
             None
         """
         self.partial_derivative_b -= self.learning_rate * computed_bias_gradient
 
-    def _sigmoid_function (self, predictions: np.ndarray):
-        """
-        Converts the raw linear regression predictions into logits: 1 / (1 + e^-z)
+    def _sigmoid_function(self, predictions: np.ndarray):
+        """Apply the sigmoid function to convert scores to probabilities.
 
-        Parameters:
-            predictions (np.ndarray): Contains the raw linear regression predictions to be converted.
+        Computes: `sigma(z) = 1 / (1 + exp(-z))`.
+
+        Args:
+            predictions (np.ndarray): Raw linear scores/logits.
 
         Returns:
-            sigmoid_logits (np.ndarray): Converted predictions using sigmoid function.
+            np.ndarray: Probabilities in the range (0, 1).
         """
         return 1 / (1 + np.exp(-predictions))
 
@@ -125,12 +134,11 @@ class LogisticRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame]
     ):
-        """
-        Starts training the logistic regression model
+        """Train the model on the provided dataset.
 
-        Parameters:
-            train_x: (Union[np.ndarray | pd.DataFrame]): The main training dataset
-            train_y: (Union[np.ndarray | pd.DataFrame]): The main ground truths dataset
+        Args:
+            train_x (np.ndarray | pd.DataFrame): Training features of shape (n_samples, n_features).
+            train_y (np.ndarray | pd.DataFrame): Binary targets of shape (n_samples,) or (n_samples, 1).
 
         Returns:
             None
@@ -158,15 +166,16 @@ class LogisticRegression:
             self._update_weights(computed_weights)
             self._update_bias(computed_bias)
 
-    def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
-        """
-        Taking in a np.ndarray of test samples then inferencing them using: Xw + b
+    def predict(self, test_x: Union[np.ndarray | pd.DataFrame]):
+        """Predict class labels for the given samples.
 
-        Parameters:
-            test_x (Union[np.ndarray | pd.DataFrame]): The dataset that will be inferenced
+        Produces probabilities with sigmoid and thresholds at 0.5.
+
+        Args:
+            test_x (np.ndarray | pd.DataFrame): Feature matrix of shape (n_samples, n_features).
 
         Returns:
-            predictions (np.ndarray): The inferenced elements
+            np.ndarray: Predicted class labels (0 or 1).
         """
         if isinstance(test_x, pd.DataFrame):
             test_x = test_x.to_numpy()
