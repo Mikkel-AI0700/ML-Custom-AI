@@ -67,6 +67,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         min_samples_leaf: np.int32 = 30,
         min_samples_split: np.int32 = 10,
         min_information_gain: np.float32 = 1e-4,
+        categorical_features: Union[list[int] | list[str]] = None,
         random_state: int = 42
     ):
         self.split_metric = split_metric
@@ -76,6 +77,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_split = min_samples_split
         self.min_information_gain = min_information_gain
+        self.categorical_features = categorical_features
         self.random_state = random_state
         self._root_node: Union[DecisionNode, LeafNode] = None
         self._recursive_max_depth = 0
@@ -225,6 +227,22 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
                 yield feature_index, feature_percentile_range
 
+    def _split_features (self, X: np.ndarray):
+        return X[:, ~self.categorical_features], X[:, self.categorical_features]
+
+    def _split_yield (
+        self, 
+        X: np.ndarray, 
+        numeric_features: list[int],
+        categorical_features: list[str],
+        loop_numeric: bool = False, 
+        loop_categorical: bool = False
+    ):
+        if loop_numeric:
+            pass
+        if loop_categorical:
+            pass
+
     def _split_data (self, X: np.ndarray):
         """
         Will iterate using the yielded values from _generate_thresholds, then split it
@@ -239,14 +257,13 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             filtered_below_threshold (np.ndarray): The ndarray containing all the values that fall under the percentile threshold
             filtered_above_threhsold (np.ndarray): The ndarray containing all the values that is above the percentile threhsold
         """
-        for feat_index, percentile_threshold in self._generate_thresholds(X):
-            group_below_threshold = X[:, feat_index] < percentile_threshold
-            group_above_threshold = X[:, feat_index] > percentile_threshold
+        if self.categorical_features:
+            numerical_dataset_mask, categorical_dataset_mask = self._split_features(X)
+            numeric_dataset, categorical_dataset = X[:, numerical_dataset_mask], X[:, categorical_dataset_mask]
 
-            filtered_below_threshold = X[group_below_threshold]
-            filtered_above_threshold = X[group_above_threshold]
-
-            yield feat_index, percentile_threshold, filtered_below_threshold, filtered_above_threshold
+        if self.split_metric:
+            numeric_dataset_features = self._determine_split_type(numeric_dataset)
+            categorical_dataset_features = self._determine_split_type(categorical_dataset)
 
     def _create_node (
         self, 
@@ -309,7 +326,10 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
 
         # Tree depth & min_samples_split hyperparameter check
         if recursive_tree_depth == self.max_depth or len(X) <= self.min_samples_split:
-            leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            leaf_node = self._create_node(
+                computed_class_probabilities=self._compute_class_probability(X), 
+                create_leaf_node=True
+            )
             return leaf_node
 
         for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
@@ -323,14 +343,20 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
 
         # min_information_gain hyperparameter check
         if best_computed_information_gain < self.min_information_gain:
-            instantiated_leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            instantiated_leaf_node = self._create_node(
+                computed_class_probabilities=self._compute_class_probability(X), 
+                create_leaf_node=True
+            )
             return instantiated_decision_node
 
         # min_samples_leaf hyperparameter check
         if (best_computed_left_split.shape[0] < self.min_samples_leaf or
             best_computed_right_split.shape[0] < self.min_samples_leaf
         ):
-            instantiated_leaf_node = self._create_node(computed_class_probabilities=self._compute_class_probability(X), create_leaf_node=True)
+            instantiated_leaf_node = self._create_node(
+                computed_class_probabilities=self._compute_class_probability(X), 
+                create_leaf_node=True
+            )
             return instantiated_leaf_node
 
         instantiated_decision_node = self._create_node(
