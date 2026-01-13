@@ -1,11 +1,3 @@
-"""Dataset validation utilities.
-
-This module provides a `DatasetValidation` class that performs a series of
-validation checks on NumPy datasets. On validation failure, methods print the
-corresponding custom exception message and terminate the process with
-`EXIT_FAILURE`.
-"""
-
 from typing import Union, Callable
 from inspect import signature
 import numpy as np
@@ -37,7 +29,6 @@ class DatasetValidation:
     """
 
     def __init__ (self):
-        """Initialize the validator and internal failure-tracking lists."""
         self.datasets_with_infinity = []
         self.datasets_with_nan = []
         self.datasets_with_non = []
