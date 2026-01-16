@@ -227,21 +227,27 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
                 yield feature_index, feature_percentile_range
 
-    def _split_features (self, X: np.ndarray):
-        return X[:, ~self.categorical_features], X[:, self.categorical_features]
+    def _split_yield (self, X: np.ndarray, numeric_features: list[int], categorical_features: list[int]):
+        if numeric_features:
+            for num_feat in numeric_features:
+                for num_feat_index, num_feat_value in enumerate(np.nditer(X[:, num_feat])):
+                    midpoint_value = (num_feat_value[num_feat_index] + num_feat_value[num_feat_index + 1]) / 2
+                    yield (
+                        "numerical",
+                        midpoint_value,
+                        np.where(X[:, num_feat] > midpoint_value),
+                        np.where(X[:, num_feat] < midpoint_value)
+                    )
 
-    def _split_yield (
-        self, 
-        X: np.ndarray, 
-        numeric_features: list[int],
-        categorical_features: list[str],
-        loop_numeric: bool = False, 
-        loop_categorical: bool = False
-    ):
-        if loop_numeric:
-            pass
-        if loop_categorical:
-            pass
+        if categorical_features:
+            for cat_feat in categorical_features:
+                for unique_feat in np.nditer(np.unique(X[:, cat_feat])):
+                    yield (
+                        "categorical",
+                        unique_feat,
+                        np.where(X[:, cat_feat] == unique_feat),
+                        np.where(X[:, cat_feat] != unique_feat)
+                    )
 
     def _split_data (self, X: np.ndarray):
         """
@@ -258,12 +264,18 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             filtered_above_threhsold (np.ndarray): The ndarray containing all the values that is above the percentile threhsold
         """
         if self.categorical_features:
-            numerical_dataset_mask, categorical_dataset_mask = self._split_features(X)
-            numeric_dataset, categorical_dataset = X[:, numerical_dataset_mask], X[:, categorical_dataset_mask]
+            numeric_dataset = X[:, ~self.categorical_features]
+            categorical_dataset = X[:, self.categorical_features]
 
         if self.split_metric:
-            numeric_dataset_features = self._determine_split_type(numeric_dataset)
-            categorical_dataset_features = self._determine_split_type(categorical_dataset)
+            numeric_features = self._determine_split_type(numeric_dataset)
+            categorical_features = self._determine_split_type(categorical_dataset)
+
+        if self.categorical_features:
+            num_feat_index, num_feat_percentile = self._split_yield(X, numeric_features)
+            
+        else:
+            pass
 
     def _create_node (
         self, 
