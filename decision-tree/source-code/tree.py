@@ -211,22 +211,6 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
 
         return feature_indices
         
-    def _generate_thresholds (self, X: np.ndarray):
-        """
-        Splits and yields the data based on percentile thresholds
-
-        Parameters:
-            X (np.ndarray): The entire or just the subset of the dataset to be splitted
-
-        Yields:
-            feature_index (int): The current iterated feature index
-            feature_percentile_range (np.ndarray): Values that fall under certain percentile range
-        """
-        feature_indices = self._determine_split_type(X)
-        for feature_index in feature_indices:
-            for feature_percentile_range in np.percentile(X[:, feature_index], q=np.arange(25, 100, 25)):
-                yield feature_index, feature_percentile_range
-
     def _split_yield (self, X: np.ndarray, numeric_features: list[int], categorical_features: list[int]):
         if numeric_features:
             for num_feat in numeric_features:
