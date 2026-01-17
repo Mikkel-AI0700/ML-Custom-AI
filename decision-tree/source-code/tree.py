@@ -214,13 +214,14 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
     def _split_yield (self, X: np.ndarray, numeric_features: list[int], categorical_features: list[int]):
         if numeric_features:
             for num_feat in numeric_features:
-                for num_feat_index, num_feat_value in enumerate(np.nditer(X[:, num_feat])):
-                    midpoint_value = (num_feat_value[num_feat_index] + num_feat_value[num_feat_index + 1]) / 2
+                unique_values = np.unique(X[:, num_feat])
+                computed_midpoint_thresholds = (unique_values[:-1] + unique_values[1:]) / 2
+                for threshold in computed_midpoint_thresholds:
                     yield (
                         "numerical",
-                        midpoint_value,
-                        np.where(X[:, num_feat] > midpoint_value),
-                        np.where(X[:, num_feat] < midpoint_value)
+                        threshold,
+                        np.where(X[:, num_feat] > threshold),
+                        np.where(X[:, num_feat] < threshold)
                     )
 
         if categorical_features:
@@ -251,13 +252,14 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             numeric_dataset = X[:, ~self.categorical_features]
             categorical_dataset = X[:, self.categorical_features]
 
-        if self.split_metric:
+        if self.split_metric and self.categorical_features:
             numeric_features = self._determine_split_type(numeric_dataset)
             categorical_features = self._determine_split_type(categorical_dataset)
+        else:
+            numeric_features = self._determine_split_type(X)
 
         if self.categorical_features:
-            num_feat_index, num_feat_percentile = self._split_yield(X, numeric_features)
-            
+            feat_dtype, num_split_type, 
         else:
             pass
 
