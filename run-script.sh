@@ -20,8 +20,8 @@ function check_tld_venv () {
     if [[ ${main_tld_passed} -eq 1 && ${main_venv_passed} -eq 1 ]]; then
         echo "[+] PYTHON_TLD and VIRTUAL ENVIRONMENT IS SET"
     else
-        { export PYTHON_TLD="${PYTHON_TLD}" && echo "[+] PYTHON_TLD is now set!" && main_tld_passed=1 } || { echo "[-] Unable to set PYTHON_TLD" && exit 1 }
-        { source "main-venv/bin/activte" && echo "[+] VENV is now set!" && main_venv_passed=1 } || { echo "[-] Unable to set VENV" && exit 1 }
+        { export PYTHON_TLD="${PYTHON_TLD}" && echo "[+] PYTHON_TLD is now set!" && main_tld_passed=1; } || { echo "[-] Unable to set PYTHON_TLD" && exit 1; }
+        { source "main-venv/bin/activate" && echo "[+] VENV is now set!" && main_venv_passed=1; } || { echo "[-] Unable to set VENV" && exit 1; }
         check_tld_venv
     fi
 }
@@ -32,20 +32,19 @@ function generate_datasets () {
 
     if [[ ${gen_tld_passed} -eq 1 && ${gen_venv_passed} -eq 1 ]]; then
         if [[ "${algorithm_type}" == "regression" ]]; then
-            ;
+            :
         elif [[ "${algorithm_type}" == "classification" ]]; then
-            ;
+            :
         elif [[ "${algorithm_type}" == "clustering" ]]; then
-            ;
+            :
         else
-            ;
+            :
         fi
     fi
 }
 
 function main () {
-  check_tld
-  check_venv
+    check_tld_venv
 
     if [[ ${tld_passed} -eq 1 && ${venv_passed} -eq 1 ]] ; then
         echo "[+] TLD and VENV set. Running: $1"
@@ -55,6 +54,7 @@ function main () {
         elif [[ "$1" == "logreg" ]] ; then
             python3 ${LOG_REG_SOURCE}
         elif [[ "$1" == "tree" ]]; then
+            :
         fi
     fi
 }
