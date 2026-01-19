@@ -9,13 +9,11 @@ from base.ClassifierMixin import ClassifierMixin
 class DecisionNode:
     def __init__ (
         self,
-        split_feat_index: int,
         split_feat_num_condition: int,
         split_feat_cat_condition: Union[int, str],
         information_gain: float
     ):
         self.node_is_decision = False
-        self.feat_index = split_feat_index
         self.feat_num_condition = split_feat_num_condition
         self.feat_cat_condition = split_feat_cat_condition
         self.information_gain = information_gain
@@ -259,13 +257,32 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             numeric_features = self._determine_split_type(X)
 
         if self.categorical_features:
-            feat_dtype, num_split_type, 
+            (
+                feat_type,
+                numerical_threshold,
+                above_group_threshold,
+                below_group_threshold
+            ) = self._split_yield(X, numeric_features, categorical_features)
+            (
+                feat_type,
+                categorical_element,
+                group_equal_element,
+                group_unequal_element
+            ) = self._split_yield(X, numeric_features, categorical_features)
+
+            yield feat_type, numerical_threshold, above_group_threshold, below_group_threshold
+            yield feat_type, categorical_element, group_equal_element, group_unequal_element
         else:
-            pass
+            (
+                feat_type,
+                numerical_threshold,
+                above_group_threshold,
+                below_group_threshold
+            ) = self._split_yield(X, numeric_features, categorical_features)
+            yield feat_type, numerical_threshold, above_group_threshold, below_group_threshold
 
     def _create_node (
         self, 
-        split_index: int,
         split_num_condition: Union[int, float],
         split_cat_condition: Union[int, float],
         information_gain: float,
@@ -290,12 +307,18 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             instantiated_node (Union[DecisionNode, LeafNode]): The instantiated object of either the DecisionNode or LeafNode
         """
         if create_decision_node:
-            instantiated_decision_node = DecisionNode(
-                split_feat_index=split_index,
-                split_feat_num_condition=split_num_condition,
-                split_feat_cat_condition=None,
-                information_gain=information_gain
-            )
+            if split_num_condition:
+                instantiated_decision_node = DecisionNode(
+                    split_feat_num_condition=split_num_condition,
+                    split_feat_cat_condition=None,
+                    information_gain=information_gain
+                )
+            if split_cat_condition:
+                instantiated_decision_node = DecisionNode(
+                    split_feat_num_condition=None,
+                    split_feat_cat_condition=split_cat_condition,
+                    information_gain=information_gain
+                )
             return instantiated_decision_node
 
         if create_leaf_node:
@@ -317,8 +340,8 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             (Union[DecisionNode, LeafNode]): Returns DecisionNode if no stopping criteria is met, else returns LeafNode
         """
         best_computed_information_gain = 0
-        best_split_index = 0
-        best_split_condition = 0
+        best_num_split_condition = 0
+        best_unique_split_condition = None
         best_computed_left_split: np.ndarray = None
         best_computed_right_split: np.ndarray = None
 
@@ -330,14 +353,26 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             )
             return leaf_node
 
-        for feat_index, percentile_threshold, below_group, above_group in self._split_data(X):
-            # TODO: Add logic that will check if the decision tree is running for the first time
-            computed_information_gain = self._compute_information_gain(X, below_group, above_group)
-            if computed_information_gain > best_computed_information_gain:
-                best_split_index = feat_index
-                best_split_condition = percentile_threshold
-                best_computed_left_split = below_group
-                best_computed_right_split = above_group
+        for feat_type, condition, group_above_condition, group_below_condition in self._split_data(X):
+            if feat_type == "numerical":
+                num_feat_information_gain = self._compute_information_gain(X, group_above_condition, group_below_condition)
+                if num_feat_information_gain > best_computed_information_gain:
+                    best_computed_information_gain = num_feat_information_gain
+                    best_num_split_condition = condition
+                    best_computed_left_split = group_above_condition
+                    best_computed_right_split = group_below_condition
+                else:
+                    continue
+
+            if feat_type == "categorical":
+                cat_feat_information_gain = self._compute_information_gain(X, group_above_condition, group_below_condition)
+                if cat_feat_information_gain > best_computed_information_gain:
+                    best_computed_information_gain = cat_feat_information_gain
+                    best_unique_split_condition = condition
+                    best_computed_left_split = group_above_condition
+                    best_computed_right_split = group_below_condition
+                else:
+                    continue
 
         # min_information_gain hyperparameter check
         if best_computed_information_gain < self.min_information_gain:
@@ -358,9 +393,8 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             return instantiated_leaf_node
 
         instantiated_decision_node = self._create_node(
-            split_index=best_split_index,
-            split_num_condition=best_split_condition,
-            split_cat_condition=None,
+            split_num_condition=best_num_split_condition,
+            split_cat_condition=best_unique_split_condition,
             information_gain=best_computed_information_gain,
             create_decision_node=True
         )
