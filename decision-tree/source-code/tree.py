@@ -33,7 +33,7 @@ class LeafNode:
     def compute_argmax (self):
         return np.argmax(self.tree_computed_probabilities)
 
-class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierMixin):
+class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
     """
     DecisionTreeClassifier class uses the concept of a greedy algorithm to search
     from top to bottom what best separates all the unique classes in the dataset
