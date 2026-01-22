@@ -69,6 +69,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         min_samples_leaf: np.int32 = 30,
         min_samples_split: np.int32 = 10,
         min_information_gain: np.float32 = 1e-4,
+        numerical_features: Union[list[int] | list[str]] = None,
         categorical_features: Union[list[int] | list[str]] = None,
         random_state: int = 42
     ):
@@ -79,6 +80,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_split = min_samples_split
         self.min_information_gain = min_information_gain
+        self.numerical_features = numerical_features
         self.categorical_features = categorical_features
         self.random_state = random_state
         self._root_node: Union[DecisionNode, LeafNode] = None
@@ -252,17 +254,18 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             filtered_above_threhsold (np.ndarray): The ndarray containing all the values that is above the percentile threhsold
         """
         if self.categorical_features:
-            numeric_dataset = X[:, ~self.categorical_features]
-            categorical_dataset = X[:, self.categorical_features]
+            numeric_dataset = X[:, [self.numerical_features]]
+            categorical_dataset = X[:, [self.categorical_features]]
+        else:
+            numeric_dataset = X[:, [self.numerical_features]]
 
         if self.split_metric and self.categorical_features:
             numeric_features = self._determine_feature_split_metric(numeric_dataset)
             categorical_features = self._determine_feature_split_metric(categorical_dataset)
         else:
-            numeric_features = self._determine_split_type(X)
+            numeric_features = self._determine_feature_split_metric(X)
 
-        if self.categorical_features:
-            yield from self._split_yield(X, numeric_features, categorical_features)
+        yield from self._split_yield(X, numeric_features, categorical_features)
 
     def _create_node (
         self,
@@ -291,14 +294,14 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             instantiated_node (Union[DecisionNode, LeafNode]): The instantiated object of either the DecisionNode or LeafNode
         """
         if create_decision_node:
-            if split_num_condition:
+            if split_num_condition is not None:
                 instantiated_decision_node = DecisionNode(
                     split_index=split_index,
                     split_feat_num_condition=split_num_condition,
                     split_feat_cat_condition=None,
                     information_gain=information_gain
                 )
-            if split_cat_condition:
+            if split_cat_condition is not None:
                 instantiated_decision_node = DecisionNode(
                     split_index=split_index,
                     split_feat_num_condition=None,
@@ -349,7 +352,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                     best_num_split_condition = condition
                     best_computed_left_split = group_above_condition
                     best_computed_right_split = group_below_condition
-                    best_cat_split_condition = None
+                    best_unique_split_condition = None
                 else:
                     continue
 
