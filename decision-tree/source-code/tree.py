@@ -63,8 +63,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
     def __init__ (
         self,
         split_metric: str = "gini",
-        split_type: str = None,
         max_depth: np.int32 = 10,
+        max_features: Union[int, str] = None,
         max_leaf_nodes: np.int32 = 10,
         min_samples_leaf: np.int32 = 30,
         min_samples_split: np.int32 = 10,
@@ -73,8 +73,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         random_state: int = 42
     ):
         self.split_metric = split_metric
-        self.split_type = split_type
         self.max_depth = max_depth
+        self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_split = min_samples_split
@@ -198,12 +198,12 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         """
         feature_indices_range = list(range(X.shape[1] - 1))
 
-        if self.split_type == "sqrt":
+        if self.max_depth == "sqrt":
             feature_indices = np.random.choice(
                 feature_indices_range, 
                 size=int(np.sqrt(len(feature_indices_range)))
             )
-        elif self.split_type == "log2":
+        elif self.max_depth == "log2":
             feature_indices = np.random.choice(
                 feature_indices_range, 
                 size=int(np.log2(len(feature_indices_range)))
@@ -256,8 +256,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             categorical_dataset = X[:, self.categorical_features]
 
         if self.split_metric and self.categorical_features:
-            numeric_features = self._determine_split_type(numeric_dataset)
-            categorical_features = self._determine_split_type(categorical_dataset)
+            numeric_features = self._determine_feature_split_metric(numeric_dataset)
+            categorical_features = self._determine_feature_split_metric(categorical_dataset)
         else:
             numeric_features = self._determine_split_type(X)
 
