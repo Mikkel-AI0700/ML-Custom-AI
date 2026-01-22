@@ -11,20 +11,22 @@ from base.ClassifierMixin import ClassifierMixin
 class DecisionNode:
     def __init__ (
         self,
+        split_index: int,
         split_feat_num_condition: int,
         split_feat_cat_condition: Union[int, str],
         information_gain: float
     ):
-        self.node_is_decision = False
-        self.feat_num_condition = split_feat_num_condition
-        self.feat_cat_condition = split_feat_cat_condition
-        self.information_gain = information_gain
-        self.left_node = None
-        self.right_node = None
+        self._node_is_decision = True
+        self._split_index = split_index
+        self._feat_num_condition = split_feat_num_condition
+        self._feat_cat_condition = split_feat_cat_condition
+        self._information_gain = information_gain
+        self._left_node = None
+        self._right_node = None
 
 class LeafNode:
     def __init__ (self, computed_probabilities: np.ndarray):
-        self._node_is_leaf = False
+        self._node_is_leaf = True
         self._leaf_node_amount = 0
         self.tree_computed_probabilities = computed_probabilities
 
@@ -96,9 +98,9 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         Returns:
             unique_class_probabilities (np.ndarray): Class probabilities for unique classes
         """
-        _, label_count = np.unique(X[:, -1], return_counts=True)
-        total_lable_count = len(X[:, -1])
-        return np.asarray([label_count[index] / total_lable_count for index in range(len(label_count))])
+        Y = X[:, -1]
+        label, label_count = np.unique(Y, return_counts=True)
+        return np.asarray([label_count / len(Y)])
     
     def _compute_impurity (self, X: np.ndarray) -> np.float32:
         """
@@ -110,7 +112,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         Returns:
             computed_impurity (np.float32): The floating point computed gini impurity
         """
-        unique_probabilities = self._compute_class_probability(X[:, -1])
+        unique_probabilities = self._compute_class_probability(X)
         computed_impurity = 1 - np.sum(np.square(unique_probabilities))
         return computed_impurity
     
@@ -124,7 +126,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         Returns:
             computed_entropy (np.float32): The floating point computed gini impurity
         """
-        unique_probabilities = self._compute_class_probability(X[:, -1])
+        unique_probabilities = self._compute_class_probability(X)
         computed_entropy = -(np.sum(unique_probabilities * np.log2(unique_probabilities)))
         return computed_entropy
     
@@ -158,16 +160,16 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         Returns:
             information_gain (np.float32): The floating point computed information gain
         """
-        main_data_impurity = self._evaluate_split_type(X)
-        left_subset_impurity = self._evaluate_split_type(left_subset)
-        right_subset_impurity = self._evaluate_split_type(right_subset)
+        main_data_impurity = self._determine_impurity_metric(X)
+        left_subset_impurity = self._determine_impurity_metric(left_subset)
+        right_subset_impurity = self._determine_impurity_metric(right_subset)
 
         left_subset_weighted = len(left_subset) / len(X) * left_subset_impurity
         right_subset_weighted = len(right_subset) / len(X) * right_subset_impurity
         
         return main_data_impurity - (left_subset_weighted + right_subset_weighted)
     
-    def _evaluate_split_type (self, X: np.ndarray):
+    def _determine_impurity_metric (self, X: np.ndarray):
         """
         Will evaluate the type of splitting metric type on the entire or just a subset of the dataset
 
@@ -184,7 +186,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         else:
             return self._compute_log_loss() # WARNING: Very volatile code. Don't be stupid and run this line ;)
     
-    def _determine_split_type (self, X: np.ndarray) -> np.ndarray:
+    def _determine_feature_split_metric (self, X: np.ndarray) -> np.ndarray:
         """
         Splits N amount of features depending on what split metric will be used
 
@@ -196,12 +198,12 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         """
         feature_indices_range = list(range(X.shape[1] - 1))
 
-        if self.split_metric == "sqrt":
+        if self.split_type == "sqrt":
             feature_indices = np.random.choice(
                 feature_indices_range, 
                 size=int(np.sqrt(len(feature_indices_range)))
             )
-        elif self.split_metric == "log2":
+        elif self.split_type == "log2":
             feature_indices = np.random.choice(
                 feature_indices_range, 
                 size=int(np.log2(len(feature_indices_range)))
@@ -210,7 +212,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             feature_indices = feature_indices_range
 
         return feature_indices
-        
+    
     def _split_yield (self, X: np.ndarray, numeric_features: list[int], categorical_features: list[int]):
         if numeric_features:
             for num_feat in numeric_features:
@@ -219,19 +221,20 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
                 for threshold in computed_midpoint_thresholds:
                     yield (
                         "numerical",
+                        num_feat,
                         threshold,
-                        np.where(X[:, num_feat] > threshold),
-                        np.where(X[:, num_feat] < threshold)
+                        X[X[:, num_feat] > threshold],
+                        X[X[:, num_feat] < threshold]
                     )
-
         if categorical_features:
             for cat_feat in categorical_features:
                 for unique_feat in np.nditer(np.unique(X[:, cat_feat])):
                     yield (
                         "categorical",
+                        cat_feat,
                         unique_feat,
-                        np.where(X[:, cat_feat] == unique_feat),
-                        np.where(X[:, cat_feat] != unique_feat)
+                        X[X[:, cat_feat] == unique_feat],
+                        X[X[:, cat_feat] != unique_feat]
                     )
 
     def _split_data (self, X: np.ndarray):
@@ -259,12 +262,11 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             numeric_features = self._determine_split_type(X)
 
         if self.categorical_features:
-            yield from self._split_data(X, numeric_features, categorical_features)
-        else:
-            yield from self._split_data(X, numeric_dataset)
+            yield from self._split_yield(X, numeric_features, categorical_features)
 
     def _create_node (
-        self, 
+        self,
+        split_index: int,
         split_num_condition: Union[int, float],
         split_cat_condition: Union[int, float],
         information_gain: float,
@@ -291,12 +293,14 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         if create_decision_node:
             if split_num_condition:
                 instantiated_decision_node = DecisionNode(
+                    split_index=split_index,
                     split_feat_num_condition=split_num_condition,
                     split_feat_cat_condition=None,
                     information_gain=information_gain
                 )
             if split_cat_condition:
                 instantiated_decision_node = DecisionNode(
+                    split_index=split_index,
                     split_feat_num_condition=None,
                     split_feat_cat_condition=split_cat_condition,
                     information_gain=information_gain
@@ -322,7 +326,8 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             (Union[DecisionNode, LeafNode]): Returns DecisionNode if no stopping criteria is met, else returns LeafNode
         """
         best_computed_information_gain = 0
-        best_num_split_condition = 0
+        best_index = None
+        best_num_split_condition = None
         best_unique_split_condition = None
         best_computed_left_split: np.ndarray = None
         best_computed_right_split: np.ndarray = None
@@ -335,24 +340,28 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             )
             return leaf_node
 
-        for feat_type, condition, group_above_condition, group_below_condition in self._split_data(X):
+        for feat_type, feat_index, condition, group_above_condition, group_below_condition in self._split_data(X):
             if feat_type == "numerical":
                 num_feat_information_gain = self._compute_information_gain(X, group_above_condition, group_below_condition)
                 if num_feat_information_gain > best_computed_information_gain:
+                    best_index = feat_index
                     best_computed_information_gain = num_feat_information_gain
                     best_num_split_condition = condition
                     best_computed_left_split = group_above_condition
                     best_computed_right_split = group_below_condition
+                    best_cat_split_condition = None
                 else:
                     continue
 
             if feat_type == "categorical":
                 cat_feat_information_gain = self._compute_information_gain(X, group_above_condition, group_below_condition)
                 if cat_feat_information_gain > best_computed_information_gain:
+                    best_index = feat_index
                     best_computed_information_gain = cat_feat_information_gain
                     best_unique_split_condition = condition
                     best_computed_left_split = group_above_condition
                     best_computed_right_split = group_below_condition
+                    best_unique_split_condition = None
                 else:
                     continue
 
@@ -362,7 +371,7 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
                 computed_class_probabilities=self._compute_class_probability(X), 
                 create_leaf_node=True
             )
-            return instantiated_decision_node
+            return instantiated_leaf_node
 
         # min_samples_leaf hyperparameter check
         if (best_computed_left_split.shape[0] < self.min_samples_leaf or
@@ -375,14 +384,15 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
             return instantiated_leaf_node
 
         instantiated_decision_node = self._create_node(
+            split_index=best_index,
             split_num_condition=best_num_split_condition,
             split_cat_condition=best_unique_split_condition,
             information_gain=best_computed_information_gain,
             create_decision_node=True
         )
 
-        instantiated_decision_node.left_node = self._build_decision_tree(best_computed_left_split, recursive_tree_depth + 1)
-        instantiated_decision_node.right_node = self._build_decision_tree(best_computed_right_split, recursive_tree_depth + 1)
+        instantiated_decision_node._left_node = self._build_decision_tree(best_computed_left_split, recursive_tree_depth + 1)
+        instantiated_decision_node._right_node = self._build_decision_tree(best_computed_right_split, recursive_tree_depth + 1)
 
         return instantiated_decision_node
 
@@ -396,13 +406,19 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
         Returns:
             (list[np.float32]): Computed class probabilities inside leaf node
         """
-        if root_node._node_is_leaf:
-            return True, root_node.compute_argmax()
+        while root_node._node_is_decision:
+            if root_node._feat_num_condition and X[root_node._split_index] > root_node._feat_num_condition:
+                self._inference_traversal_tree(X, root_node._left_node)
+            else:
+                self._inference_traversal_tree(X, root_node._right_node)
 
-        if root_node.feat_num_condition < X:
-            return self._inference_traversal_tree(X, root_node.left_node)
-        else:
-            return self._inference_traversal_tree(X, root_node.right_node)
+            if root_node._feat_cat_condition and X[root_node._split_index] == root_node._feat_cat_condition:
+                self._inference_traversal_tree(X, root_node._left_node)
+            else:
+                self._inference_traversal_tree(X, root_node._right_node)
+
+            if root_node._node_is_leaf:
+                return True, root_node.compute_argmax()
 
     def fit (self, X: np.ndarray):
         """
@@ -436,8 +452,6 @@ class DecisionTreeClassifier (DecisionNode, LeafNode, BaseEstimator, ClassifierM
                 inferenced_elements_array.append(predicted_class)
             
         return np.asarray(inferenced_elements_array)
-        # TODO: Fix the logic where it will just get the highest argmax value of the stored
-        # TODO: class probabilities
 
 def main ():
     # --- Load data generated by python-utilities/generator-files/generator.py ---
