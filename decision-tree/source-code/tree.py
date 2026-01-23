@@ -9,6 +9,34 @@ from base.BaseEstimator import BaseEstimator
 from base.ClassifierMixin import ClassifierMixin
 
 class DecisionNode:
+    """Internal decision node used by :class:`DecisionTreeClassifier`.
+
+    A decision node stores a single split rule and pointers to the left/right
+    subtrees. The rule can be either numerical (threshold) or categorical
+    (equality check), depending on which condition is populated.
+
+    Parameters
+    ----------
+    split_index : int
+        Feature index used for the split.
+    split_feat_num_condition : int or float or None
+        Numerical threshold used for the split. Samples with
+        ``X[split_index] > split_feat_num_condition`` follow the left subtree in
+        this implementation.
+    split_feat_cat_condition : int or str or None
+        Categorical value used for the split. Samples with
+        ``X[split_index] == split_feat_cat_condition`` follow the left subtree in
+        this implementation.
+    information_gain : float
+        Information gain associated with the chosen split.
+
+    Attributes
+    ----------
+    _left_node : DecisionNode or LeafNode or None
+        Left subtree.
+    _right_node : DecisionNode or LeafNode or None
+        Right subtree.
+    """
     def __init__ (
         self,
         split_index: int,
@@ -25,31 +53,97 @@ class DecisionNode:
         self._right_node = None
 
 class LeafNode:
+    """Internal leaf node used by :class:`DecisionTreeClassifier`.
+
+    The leaf stores the class distribution observed at training time for the
+    subset of samples reaching the leaf.
+
+    Parameters
+    ----------
+    computed_probabilities : numpy.ndarray
+        Class probability vector computed from the labels in the node's subset.
+
+    Attributes
+    ----------
+    tree_computed_probabilities : numpy.ndarray
+        Stored probability vector for the leaf.
+    """
     def __init__ (self, computed_probabilities: np.ndarray):
         self._node_is_leaf = True
         self._leaf_node_amount = 0
         self.tree_computed_probabilities = computed_probabilities
 
     def compute_argmax (self):
+        """Return the predicted class index at this leaf.
+
+        Returns
+        -------
+        int
+            Index of the maximum probability class.
+        """
         return np.argmax(self.tree_computed_probabilities)
 
 class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
-    """
-    DecisionTreeClassifier class uses the concept of a greedy algorithm to search
-    from top to bottom what best separates all the unique classes in the dataset
+    """Greedy decision tree classifier.
 
-    Parameters:
-        split_metric (str): The splitting criteria using Information Theory when computing the impurity or randomness of the classes
-        split_type (str): Controls how much features to be used after splitting
-        max_depth (int): The maximum allowable depth of recursively created subtrees
-        max_leaf_nodes (int): The maximum allowable amount of created leaf nodes in the tree
-        min_samples_leaf (int): The minimum allowable amount of samples needed inside a node to convert to leaf
-        min_samples_split (int): The minimum allowable amount of samples needed inside a node to split
-        min_information_gain (float): The minimum allowable information gain per iteration. If below, will convert to leaf node.
-        random_state (int): Controls computer's randomness. Ensures reproducibility
+    This is a custom implementation of a (binary) decision tree classifier that
+    recursively selects a split maximizing information gain (according to the
+    configured impurity metric) and grows subtrees until a stopping criterion is
+    reached.
 
-    Returns:
-        DecisionTreeClassifier (object): The instantiated DecisionTreeClassifier
+    The training API differs slightly from scikit-learn: during ``fit`` this
+    implementation expects the target labels to be present in the last column of
+    the provided training array.
+
+    Parameters
+    ----------
+    split_metric : {'gini', 'entropy'}, default='gini'
+        Impurity metric used to evaluate candidate splits.
+    max_depth : numpy.int32, default=10
+        Maximum recursion depth for the tree (root depth is 1 in this
+        implementation).
+    max_features : int or str or None, default=None
+        Feature subsampling strategy.
+
+        Notes
+        -----
+        The current implementation routes feature subsampling through
+        ``_determine_feature_split_metric``. In that function, the values
+        ``'sqrt'`` and ``'log2'`` are treated specially; otherwise, all features
+        are considered.
+    max_leaf_nodes : numpy.int32, default=10
+        Maximum number of leaf nodes allowed.
+        
+        Notes
+        -----
+        This hyperparameter is currently stored but not enforced in the tree
+        growth logic.
+    min_samples_leaf : numpy.int32, default=30
+        Minimum number of samples required in each child node after a split.
+        If either side would contain fewer than ``min_samples_leaf`` samples,
+        the split is rejected and the current node becomes a leaf.
+    min_samples_split : numpy.int32, default=10
+        Minimum number of samples required at a node to consider splitting.
+    min_information_gain : numpy.float32, default=1e-4
+        Minimum information gain required to accept a split. If the best gain is
+        below this threshold, the current node becomes a leaf.
+    numerical_features : list of int or list of str or None, default=None
+        Indices (or names) of numerical features.
+
+        Notes
+        -----
+        The splitter assumes numerical features are comparable and uses midpoint
+        thresholds between unique values.
+    categorical_features : list of int or list of str or None, default=None
+        Indices (or names) of categorical features.
+    random_state : int, default=42
+        Random seed used for feature subsampling.
+
+    Attributes
+    ----------
+    _root_node : DecisionNode or LeafNode or None
+        Root of the trained tree.
+
     """
     __parameter_constraints__ = {
         "split_metric": (str),
@@ -91,76 +185,117 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         self._param_validator = ParameterValidator()
 
     def _compute_class_probability (self, X: np.ndarray) -> np.ndarray:
-        """
-        The method computed the probability for each unique class
+        """Compute class probabilities for the labels in ``X``.
 
-        Parameters:
-            X (np.ndarray): The entire training dataset including the ground truths
+        The label vector is assumed to be stored in the last column of ``X``.
 
-        Returns:
-            unique_class_probabilities (np.ndarray): Class probabilities for unique classes
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_samples, n_features + 1)
+            Training matrix including the ground-truth labels in the last
+            column.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of class probabilities derived from label counts.
+
+        Notes
+        -----
+        This method returns the probabilities in the order produced by
+        ``numpy.unique``.
         """
         Y = X[:, -1]
         label, label_count = np.unique(Y, return_counts=True)
         return np.asarray([label_count / len(Y)])
     
     def _compute_impurity (self, X: np.ndarray) -> np.float32:
-        """
-        Computes the gini impurity using the formula: Gini = 1 - Σ(pᵢ²)
+        """Compute the Gini impurity for a dataset.
 
-        Parameters:
-            X (np.ndarray): The entire or subset of the dataset to compute the impurity on
+        Uses the definition:
 
-        Returns:
-            computed_impurity (np.float32): The floating point computed gini impurity
+        .. math::
+            1 - Σ(pᵢ²)
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset (or subset) including labels in the last column.
+
+        Returns
+        -------
+        numpy.float32
+            Gini impurity.
         """
         unique_probabilities = self._compute_class_probability(X)
         computed_impurity = 1 - np.sum(np.square(unique_probabilities))
         return computed_impurity
     
     def _compute_entropy (self, X: np.ndarray) -> np.float32:
-        """
-        Computed the entropy randomness using the formula: H(X) = -Σ p(xᵢ) log₂(p(xᵢ))
+        """Compute the Shannon entropy for a dataset.
 
-        Parameters:
-            X (np.ndarray): THe entire or subset of the dataset to compute the impurity on
+        Uses the definition:
 
-        Returns:
-            computed_entropy (np.float32): The floating point computed gini impurity
+        .. math::
+            H(X) = -Σ p(xᵢ) * log₂(p(xᵢ))
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset (or subset) including labels in the last column.
+
+        Returns
+        -------
+        numpy.float32
+            Entropy.
         """
         unique_probabilities = self._compute_class_probability(X)
         computed_entropy = -(np.sum(unique_probabilities * np.log2(unique_probabilities)))
         return computed_entropy
     
     def _compute_log_loss (self, Y_true: np.ndarray, Y_probabilities: np.ndarray) -> np.float32:
-        """
-        Computed the log loss
+        """Compute (binary) log loss.
 
-        Parameters:
-            Y_true (np.ndarray): The ground truths from the dataset
-            Y_probabilities (np.ndarray): The computed probabilities of the specific class
+        Parameters
+        ----------
+        Y_true : numpy.ndarray of shape (n_samples,)
+            Ground-truth labels.
+        Y_probabilities : numpy.ndarray of shape (n_samples,)
+            Predicted probability for the positive class.
 
-        Returns:
-            log_loss (np.float32): The floating point computed log loss
+        Returns
+        -------
+        numpy.float32
+            Mean log loss.
 
-        Warning:
-            _comnpute_log_loss still remains unstable and not yet supported.
+        Warnings
+        --------
+        This function is marked as unstable in the surrounding code and is not
+        currently used as a supported split metric.
         """
         log_loss_eq = (Y_true * np.log(Y_probabilities)) + (1 - Y_true) * np.log(1 - Y_probabilities)
         log_loss = 1 / len(Y_probabilities) * np.sum(log_loss_eq)
         return log_loss
     
     def _compute_information_gain (self, X: np.ndarray, left_subset: np.ndarray, right_subset: np.ndarray):
-        """
-        Computes the information gain using the formula: Gain(S, A) = Entropy(S) - Σ ( |Sv| / |S| ) * Entropy(Sv)
+        """Compute information gain for a candidate split.
 
-        Parameters:
-            X (np.ndarray): The entire dataset to be used for computing the information gain
-            left_subset (np.ndarray): The best subset of data with the best information gain in the left node
-            right_subset (np.ndarray): The best subset of data with the best information gain in the right node
+        Information gain is computed as the impurity of the parent node minus the
+        weighted impurities of the child nodes.
 
-        Returns:
-            information_gain (np.float32): The floating point computed information gain
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Parent dataset (includes labels in the last column).
+        left_subset : numpy.ndarray
+            Left child dataset.
+        right_subset : numpy.ndarray
+            Right child dataset.
+
+        Returns
+        -------
+        numpy.float32
+            Information gain.
         """
         main_data_impurity = self._determine_impurity_metric(X)
         left_subset_impurity = self._determine_impurity_metric(left_subset)
@@ -172,14 +307,17 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         return main_data_impurity - (left_subset_weighted + right_subset_weighted)
     
     def _determine_impurity_metric (self, X: np.ndarray):
-        """
-        Will evaluate the type of splitting metric type on the entire or just a subset of the dataset
+        """Select and compute the configured impurity metric.
 
-        Parameters:
-            X (np.ndarray): The entire of the just the subset of the dataset to be used for computing
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset (or subset) including labels in the last column.
 
-        Returns:
-            metric_score (np.float32): Coming from _compute_impurity and _compute_entropy, will return np.float32 score
+        Returns
+        -------
+        numpy.float32
+            Metric score for ``split_metric``.
         """
         if self.split_metric == "gini":
             return self._compute_impurity(X)
@@ -189,14 +327,24 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             return self._compute_log_loss() # WARNING: Very volatile code. Don't be stupid and run this line ;)
     
     def _determine_feature_split_metric (self, X: np.ndarray) -> np.ndarray:
-        """
-        Splits N amount of features depending on what split metric will be used
+        """Choose which feature indices to consider for splitting.
 
-        Parameters:
-            X (np.ndarray): The entire dataset to be splitted by N features
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Input dataset (or feature subset). The last column is assumed to be
+            the label column when ``X`` is the full training matrix.
 
-        Returns:
-            feature_indices (np.ndarray): The list of feature indices to be used when generating thresholds
+        Returns
+        -------
+        numpy.ndarray
+            Selected feature indices.
+
+        Notes
+        -----
+        The selection strategy is controlled by the estimator's configuration.
+        The current implementation special-cases the string values ``'sqrt'``
+        and ``'log2'``.
         """
         feature_indices_range = list(range(X.shape[1] - 1))
 
@@ -216,6 +364,24 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         return feature_indices
     
     def _split_yield (self, X: np.ndarray, numeric_features: list[int], categorical_features: list[int]):
+        """Generate candidate splits for numerical and categorical features.
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset to split (includes labels in the last column).
+        numeric_features : list of int
+            Indices of numerical features to consider.
+        categorical_features : list of int
+            Indices of categorical features to consider.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form
+            ``(feat_type, feat_index, condition, left_subset, right_subset)``.
+            ``feat_type`` is either ``'numerical'`` or ``'categorical'``.
+        """
         if numeric_features:
             for num_feat in numeric_features:
                 unique_values = np.unique(X[:, num_feat])
@@ -240,18 +406,31 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                     )
 
     def _split_data (self, X: np.ndarray):
-        """
-        Will iterate using the yielded values from _generate_thresholds, then split it
-        into two groups: below the threshold and above the threshold
+        """Prepare feature subsets and stream candidate splits.
 
-        Parameters:
-            X (np.ndarray): The entire or just the subset of the dataset to be splitted
+        This method acts as a "middleman" between the recursive tree builder
+        (``_build_decision_tree``) and the split generator (``_split_yield``).
+        It prepares the dataset for splitting by:
 
-        Yields:
-            feat_index (int): The current iterated feature index
-            percentile_threshold (list[ints]): The current percentile in the iteration
-            filtered_below_threshold (np.ndarray): The ndarray containing all the values that fall under the percentile threshold
-            filtered_above_threhsold (np.ndarray): The ndarray containing all the values that is above the percentile threhsold
+        - Separating numerical and categorical feature subsets (when
+            ``categorical_features`` is provided).
+        - Determining how many/which feature indices should be considered for
+            this split (feature subsampling) via ``_determine_feature_split_metric``.
+        - Delegating to ``_split_yield`` to generate candidate split rules and
+            child subsets.
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+                Dataset (or subset) to split. During training this includes the
+                labels in the last column.
+
+        Yields
+        ------
+        tuple
+                A tuple of the form
+                ``(feat_type, feat_index, condition, left_subset, right_subset)``
+                which is forwarded to ``_build_decision_tree``.
         """
         if self.categorical_features:
             numeric_dataset = X[:, [self.numerical_features]]
@@ -277,21 +456,29 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         create_decision_node: bool = False,
         create_leaf_node: bool = False,
     ) -> Union[DecisionNode, LeafNode]:
-        """
-        Will either create and return a DecisionNode or LeafNode, depending on the 
-        status of the recursive tree builder function
+        """Create and return a decision node or leaf node.
 
-        Parameters:
-            split_index (int): Split index unique to the iteration
-            split_num_condition (Union[int, float]): The numerical condition that splitted the data unique to the iteration
-            split_cat_condition (Union[int, float]): The categorical conditoon that splitted the data unique to that iteration
-            information_gain (float): The best computed information gain unique to that iteration
-            computed_class_probabilities (np.ndarray): The computed class probabilities when node reaches a certain level
-            create_decision_node (bool): Boolean flag to check that signals a DecisionNode creation
-            create_leaf_node (bool): Boolean flag to check that signals a LeafNode creation
+        Parameters
+        ----------
+        split_index : int
+            Feature index used for splitting.
+        split_num_condition : int or float or None
+            Numerical threshold used for the split.
+        split_cat_condition : int or float or None
+            Categorical equality condition used for the split.
+        information_gain : float
+            Information gain of the chosen split.
+        computed_class_probabilities : numpy.ndarray
+            Class distribution to store in a leaf node.
+        create_decision_node : bool, default=False
+            If True, create a :class:`DecisionNode`.
+        create_leaf_node : bool, default=False
+            If True, create a :class:`LeafNode`.
 
-        Returns:
-            instantiated_node (Union[DecisionNode, LeafNode]): The instantiated object of either the DecisionNode or LeafNode
+        Returns
+        -------
+        DecisionNode or LeafNode
+            Instantiated node.
         """
         if create_decision_node:
             if split_num_condition is not None:
@@ -317,16 +504,19 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             return instantiated_leaf_node
 
     def _build_decision_tree (self, X: np.ndarray, recursive_tree_depth: int = 1):
-        """
-        The main recursive tree builder function that recursively builds the main decision tree
-        by building the left and right subtrees
+        """Recursively build the decision tree.
 
-        Parameters:
-            X (np.ndarray): The entire or just the subset of the dataset that will be used when training
-            recursive_tree_depth (int): Internal tracking variable. Used to track the depth of the corresponding subtree
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset (or subset) including labels in the last column.
+        recursive_tree_depth : int, default=1
+            Current depth in the recursion.
 
-        Returns:
-            (Union[DecisionNode, LeafNode]): Returns DecisionNode if no stopping criteria is met, else returns LeafNode
+        Returns
+        -------
+        DecisionNode or LeafNode
+            Root node of the (sub)tree.
         """
         best_computed_information_gain = 0
         best_index = None
@@ -400,14 +590,20 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         return instantiated_decision_node
 
     def _inference_traversal_tree (self, X: np.ndarray, root_node: Union[DecisionNode, LeafNode]):
-        """
-        Inferences a single data point by traversing the tree until it reaches a leaf node
+        """Traverse the tree for a single sample and return the predicted class.
 
-        Parameters:
-            X (np.ndarray): A single datapoint to be inferenced
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_features,)
+            Feature vector for a single sample.
+        root_node : DecisionNode or LeafNode
+            Current node during traversal.
 
-        Returns:
-            (list[np.float32]): Computed class probabilities inside leaf node
+        Returns
+        -------
+        tuple
+            ``(is_leaf, predicted_class)`` where ``is_leaf`` is a boolean flag
+            and ``predicted_class`` is the class index (argmax at the leaf).
         """
         while root_node._node_is_decision:
             if root_node._feat_num_condition and X[root_node._split_index] > root_node._feat_num_condition:
@@ -424,29 +620,34 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                 return True, root_node.compute_argmax()
 
     def fit (self, X: np.ndarray):
-        """
-        Train the entire DecisionTreeClassifier using the entire dataset
+        """Fit the decision tree classifier.
 
-        Parameters:
-            X (np.ndarray): The entire dataset to be used for training
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_samples, n_features + 1)
+            Training data. The last column must contain the class labels.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
+            This estimator is fitted in-place.
         """
         self._dset_validator.validate_existence(X)
         self._dset_validator.validate_types(X)
         self._root_node = self._build_decision_tree(X)
 
     def predict (self, X: np.ndarray):
-        """
-        Loops over the data samples then returns the class probability
-        that corresponds to the predicted class
+        """Predict class labels for samples in ``X``.
 
-        Parameters:
-            X (np.ndarray): The entire dataset to be used for inference
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_samples, n_features)
+            Feature matrix.
 
-        Returns:
-            inferenced_elements_array (np.ndarray): Contains the predicted elements using the stored class probabilities
+        Returns
+        -------
+        numpy.ndarray of shape (n_samples,)
+            Predicted class indices.
         """
         inferenced_elements_array = []
         for row in X:
