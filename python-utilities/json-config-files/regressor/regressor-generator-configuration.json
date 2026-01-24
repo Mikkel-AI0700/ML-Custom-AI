@@ -1,0 +1,13 @@
+{
+    "n_samples": 100000,
+    "n_features": 10,
+    "n_informative": 1,
+    "n_targets": 1,
+    "noise": 0.1,
+    "bias": 0.0,
+    "random_state": 42,
+    "effective_rank": 1,
+    "tail_strength": 0.5,
+    "shuffle": true,
+    "coef": false
+}
