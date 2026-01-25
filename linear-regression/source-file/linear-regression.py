@@ -179,7 +179,7 @@ class LinearRegression:
         if self.validator.validate_existence([test_x]):
             pass
         if isinstance(test_x, pd.DataFrame):
-            print("Test x is Pandas. Converted to Numpy -> Rows: {train_x.shape[0]} | Columns: {train_x.shape[1]}")
+            print(f"Test x is Pandas. Converted to Numpy -> Rows: {test_x.shape[0]} | Columns: {test_x.shape[1]}")
             test_x.to_numpy()
 
         #test_x = np.hstack([np.ones((test_x.shape[0], 1)), test_x])
