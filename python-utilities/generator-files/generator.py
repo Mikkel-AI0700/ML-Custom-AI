@@ -38,18 +38,19 @@ def _write_to_file (filepath: Path, X: pd.DataFrame, Y: pd.DataFrame):
         dataset = pd.DataFrame(dataset)
         dataset.to_csv(os.path.join(filepath, data_filename), index=False)
 
-def _change_configuration (config_key_value: dict[str, Any], generator_configuration: dict[str, Any]):
+def _change_configuration (config_key_value: str, generator_configuration: dict[str, Any]):
     try:
-        if len(config_key_value) == 0:
+        if config_key_value is None:
             return
-        else:
-            config_key, config_value = config_key_value.items()
 
-        if config_key in generator_configuration.keys():
-            print(f"[+] Updating: {config_key} | New value: {config_value}")
-            generator_configuration.update({config_key: config_value})
-        else:
-            raise ValueError("[-] Error: Non existent parameter name detected")
+        for config_key in config_key_value.split(","):
+            stripped_config_key = config_key.strip()
+            config_name, config_value = stripped_config_key.split("=", 1)
+
+            if config_name in generator_configuration.keys():
+                generator_configuration.update({config_name: config_value})
+            else:
+                raise ValueError("[-] Error: Non existent configuration key detected.")
     except ValueError as non_existent_config_key:
         print(non_existent_config_key)
         exit(1)
@@ -114,7 +115,6 @@ def main ():
         elif parsed_arguments.dset_type == "classification":
             print("[+] Creating training and testing classification datasets")
             create_classification(
-                parsed_arguments.dataset_filename,
                 classification_dataset_path,
                 classification_json_path,
                 parsed_arguments.key_value_change
@@ -122,7 +122,6 @@ def main ():
         elif parsed_arguments.dset_type == "clustering":
             print("[+] Creating training and testing clustering datasets")
             create_clustering(
-                parsed_arguments.dset_type, 
                 clustering_dataset_path,
                 clustering_json_path,
                 parsed_arguments.key_value_change
