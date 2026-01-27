@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Global constants
-PYTHON_TLD="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai"
+PYTHONPATH="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai"
 
 # Generator compiler paths
 DATASET_GENERATOR_VENV="${PYTHON_TLD}/python-utilities/generator-venv"
 DATASET_GENERATOR_PATH="${PYTHON_TLD}/python-utilities/generator-files/generator.py"
 
 # Machine learning algorithms path
-LIN_REG_SOURCE="${PYTHON_TLD}/linear-regression/source-file/lin-reg-new.py"
-LOG_REG_SOURCE="${PYTHON_TLD}/logistic-regression/source-files/log-reg-new.py"
+LIN_REG_SOURCE="${PYTHON_TLD}/linear-regression/source-file/linear-regression.py"
+LOG_REG_SOURCE="${PYTHON_TLD}/logistic-regression/source-files/logistic-regression.py"
 TREE_SOURCE="${PYTHON_TLD}/decision-tree/source-code/tree.py"
 
 # Global Top Level Domain and VENV checks
@@ -22,8 +22,8 @@ function check_tld_venv () {
     else
         # Set the PYTHON_TLD
         {
-            export PYTHON_TLD="${PYTHON_TLD}" &&
-            echo "[+] PYTHON_TLD is now set!" &&
+            export PYTHONPATH="${PYTHONPATH}" &&
+            echo "[+] PYTHON_TLD is now set: $(echo $PYTHONPATH)" &&
             main_tld_passed=1;
         } || {
             echo "[-] Unable to set PYTHON_TLD" &&
