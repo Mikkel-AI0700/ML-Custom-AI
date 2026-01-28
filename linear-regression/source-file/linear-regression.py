@@ -1,36 +1,67 @@
 from typing import Union
 import numpy as np
 import pandas as pd
-from validator.validator import DatasetValidation
+from validator.DatasetValidation import DatasetValidation
 
 # Importing for testing purposes
 # Will be removed in the lin-reg-source.py
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import make_regression
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score
+)
  
 class LinearRegression:
     """Linear regression trained with (batch) gradient descent.
 
-    This model learns a linear mapping from features to a continuous target:
-    `y_hat = Xw + b` (if `fit_intercept=True`).
+    Learns a linear mapping from features to a continuous target.
 
-    Attributes:
-        partial_derivative_m (np.ndarray | None): Weight vector (initialized in `fit`).
-        partial_derivative_b (float | None): Bias term (initialized in `fit` if `fit_intercept=True`).
-        epochs (int): Number of training iterations.
-        learning_rate (float): Step size for gradient updates.
-        fit_intercept (bool): Whether to learn an intercept term.
-        validator (DatasetValidation): Dataset validation helper.
+    The prediction function is:
+    `y_hat = Xw + b` (when `fit_intercept=True`).
+
+    Parameters
+    ----------
+    epoch : int
+        Number of training iterations (epochs).
+    learning_rate : float, default=1e-4
+        Step size used for gradient descent updates.
+    fit_intercept : bool, default=True
+        Whether to learn an intercept/bias term `b`.
+
+    Attributes
+    ----------
+    partial_derivative_m : np.ndarray or None
+        Weight vector `w`. Initialized in `fit` with shape `(n_features,)`.
+    partial_derivative_b : float or None
+        Bias term `b`. Initialized in `fit` when `fit_intercept=True`.
+    epochs : int
+        Number of training iterations.
+    learning_rate : float
+        Step size for gradient updates.
+    fit_intercept : bool
+        Whether the model uses an intercept term.
+    validator : DatasetValidation
+        Dataset validation helper.
+
+    Notes
+    -----
+    - This implementation uses batch gradient descent.
+    - The training loop prints per-epoch information.
     """
 
     def __init__ (self, epoch: int, learning_rate: float = 1e-4, fit_intercept: bool = True):
         """Initialize the LinearRegression model.
 
-        Args:
-            epoch (int): Number of training iterations.
-            learning_rate (float, optional): Step size for gradient updates. Defaults to 1e-4.
-            fit_intercept (bool, optional): Whether to learn an intercept/bias term. Defaults to True.
+        Parameters
+        ----------
+        epoch : int
+            Number of training iterations (epochs).
+        learning_rate : float, default=1e-4
+            Step size for gradient descent updates.
+        fit_intercept : bool, default=True
+            Whether to learn an intercept/bias term.
         """
         self.partial_derivative_m = None
         self.partial_derivative_b = None
@@ -42,11 +73,14 @@ class LinearRegression:
     def _initialize_weights_bias (self, train_x: np.ndarray):
         """Initialize model weights (and bias if enabled).
 
-        Args:
-            train_x (np.ndarray): Training feature matrix of shape (n_samples, n_features).
+        Parameters
+        ----------
+        train_x : np.ndarray
+            Training feature matrix with shape `(n_samples, n_features)`.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         self.partial_derivative_m = np.zeros((train_x.shape[1]))
 
@@ -56,16 +90,22 @@ class LinearRegression:
     def _compute_cost (self, train_y: np.ndarray, pred_y: np.ndarray):
         """Compute the training loss.
 
-        Note:
-            Despite the name, this returns the *sum* of squared errors (SSE),
-            not the mean squared error (MSE).
+        Notes
+        -----
+        Despite the name, this returns the sum of squared errors (SSE), not
+        the mean squared error (MSE).
 
-        Args:
-            train_y (np.ndarray): Ground-truth targets.
-            pred_y (np.ndarray): Model predictions.
+        Parameters
+        ----------
+        train_y : np.ndarray
+            Ground-truth targets.
+        pred_y : np.ndarray
+            Model predictions.
 
-        Returns:
-            float: Sum of squared errors over all samples.
+        Returns
+        -------
+        float
+            Sum of squared errors over all samples.
         """
         return np.sum(np.square(pred_y - train_y))
 
@@ -75,13 +115,19 @@ class LinearRegression:
         Uses the batch gradient for squared error:
         `dw = (1 / m) * X^T (y_pred - y)`.
 
-        Args:
-            train_x (np.ndarray): Feature matrix of shape (m, n_features).
-            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
-            pred_y (np.ndarray): Predictions of shape compatible with `train_y`.
+        Parameters
+        ----------
+        train_x : np.ndarray
+            Feature matrix with shape `(m, n_features)`.
+        train_y : np.ndarray
+            Targets with shape `(m,)` or `(m, 1)`.
+        pred_y : np.ndarray
+            Predictions with shape compatible with `train_y`.
 
-        Returns:
-            np.ndarray: Weight gradients of shape (n_features,).
+        Returns
+        -------
+        np.ndarray
+            Weight gradients with shape `(n_features,)`.
         """
         return 1 / len(train_x) * np.dot(train_x.T, (pred_y - train_y))
 
@@ -91,12 +137,17 @@ class LinearRegression:
         Uses:
         `db = (1 / m) * sum(y_pred - y)`.
 
-        Args:
-            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
-            pred_y (np.ndarray): Predictions of shape compatible with `train_y`.
+        Parameters
+        ----------
+        train_y : np.ndarray
+            Targets with shape `(m,)` or `(m, 1)`.
+        pred_y : np.ndarray
+            Predictions with shape compatible with `train_y`.
 
-        Returns:
-            float: Bias gradient.
+        Returns
+        -------
+        float
+            Bias gradient.
         """
         return 1 / len(train_y) * np.sum(pred_y - train_y)
 
@@ -106,11 +157,14 @@ class LinearRegression:
         Update rule:
         `w = w - learning_rate * dw`.
 
-        Args:
-            computed_weights_gradients (np.ndarray): Weight gradients (dw).
+        Parameters
+        ----------
+        computed_weights_gradients : np.ndarray
+            Weight gradients `dw`.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         self.partial_derivative_m -= self.learning_rate * computed_weights_gradients
 
@@ -120,11 +174,14 @@ class LinearRegression:
         Update rule:
         `b = b - learning_rate * db`.
 
-        Args:
-            computed_bias_gradients (float): Bias gradient (db).
+        Parameters
+        ----------
+        computed_bias_gradients : float
+            Bias gradient `db`.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         self.partial_derivative_b -= self.learning_rate * computed_bias_gradients
 
@@ -133,20 +190,24 @@ class LinearRegression:
         train_x: Union[np.ndarray | pd.DataFrame],
         train_y: Union[np.ndarray | pd.DataFrame],
     ):
-        """Train the model on the provided dataset.
+        """Fit the model to training data.
 
-        Args:
-            train_x (np.ndarray | pd.DataFrame): Training features of shape (n_samples, n_features).
-            train_y (np.ndarray | pd.DataFrame): Training targets of shape (n_samples,) or (n_samples, 1).
+        Parameters
+        ----------
+        train_x : np.ndarray or pandas.DataFrame
+            Training features with shape `(n_samples, n_features)`.
+        train_y : np.ndarray or pandas.DataFrame
+            Training targets with shape `(n_samples,)` or `(n_samples, 1)`.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        The training loop computes predictions as:
+        `y_hat = Xw + b`.
         """
-        if (self.validator.validate_existence([train_x, train_y]) and
-            self.validator.validate_shapes(train_x, train_y)
-        ):
-            print("Validator checks passed. Proceeding with dataset checking")
-
         if isinstance(train_x, pd.DataFrame):
             train_x = train_x.to_numpy()
             print(f"[+] Train x is Pandas. Converted to Numpy -> Rows: {train_x.shape[0]} | Columns: {train_x.shape[1]}")
@@ -154,44 +215,53 @@ class LinearRegression:
             train_y = train_y.to_numpy()
             print(f"[+] Train y is Pandas. Converted to Numpy -> Rows: {train_y.shape[0]} | Columns: {train_y.shape[1]}")
 
+        if self.validator.perform_dataset_validation(train_x, train_y):
+            print("Validator checks passed. Proceeding with dataset checking")
+
         self._initialize_weights_bias(train_x)
         for epoch in range(self.epochs):
-            print(f"Batch: {epoch + 1} | M: {self.partial_derivative_m}")
+            print(f"Batch: {epoch + 1} | M: {self.partial_derivative_m} | B: {self.partial_derivative_b}")
             
             # Main training loop
             predictions = np.dot(train_x, self.partial_derivative_m) + self.partial_derivative_b
             computed_weights = self._compute_weights_gradient(train_x, train_y, predictions)
             computed_bias = self._compute_bias_gradients(train_y, predictions)
             self._update_weights_gradient(computed_weights)
-            self._update_bias_gradient(computed_bias) 
+            self._update_bias_gradient(computed_bias)
 
     def predict (self, test_x: Union[np.ndarray | pd.DataFrame]):
         """Predict targets for the given samples.
 
         Computes `Xw + b` using the learned parameters.
 
-        Args:
-            test_x (np.ndarray | pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        Parameters
+        ----------
+        test_x : np.ndarray or pandas.DataFrame
+            Feature matrix with shape `(n_samples, n_features)`.
 
-        Returns:
-            np.ndarray: Predicted values.
+        Returns
+        -------
+        np.ndarray
+            Predicted values.
         """
-        if self.validator.validate_existence([test_x]):
-            pass
         if isinstance(test_x, pd.DataFrame):
             print(f"Test x is Pandas. Converted to Numpy -> Rows: {test_x.shape[0]} | Columns: {test_x.shape[1]}")
             test_x.to_numpy()
 
-        #test_x = np.hstack([np.ones((test_x.shape[0], 1)), test_x])
+        if self.validator.perform_dataset_validation(test_x, None):
+            pass
 
         return np.dot(test_x, self.partial_derivative_m) + self.partial_derivative_b
 
 # TESTING PURPOSES ONLY!
-# main() FUNCTION WILL BE REMOVED IN lin-reg-source.py
 def main ():
-    linreg_instance = LinearRegression(epoch=2300, learning_rate=1e-3)
+    # NOTE: `main()` is for testing/benchmarking only.
+    import time
+    from sklearn.linear_model import LinearRegression as SklearnLinearRegression
+
+    linreg_instance = LinearRegression(epoch=2700, learning_rate=1e-3)
     X, Y = make_regression(
-        n_samples=200_000,
+        n_samples=1_000_000,
         n_features=5,
         random_state=42
     )
@@ -205,10 +275,39 @@ def main ():
         random_state=42
     )
 
+    # Silence the per-epoch prints during benchmarking.
+    t0 = time.perf_counter()
     linreg_instance.fit(tr_x, tr_y)
+    t1 = time.perf_counter()
 
     preds = linreg_instance.predict(ts_x)
-    print(f"[+] MSE: {mean_squared_error(ts_y, preds)}")    
+    mse = mean_squared_error(ts_y, preds)
+    mae = mean_absolute_error(ts_y, preds)
+    rmse = float(np.sqrt(mse))
+    y_mean = float(np.mean(ts_y))
+    y_std = float(np.std(ts_y))
+    y_min = float(np.min(ts_y))
+    y_max = float(np.max(ts_y))
+
+    print(f"[+] Target (test) mean/std: {y_mean:.6f} / {y_std:.6f} | min/max: {y_min:.6f} / {y_max:.6f}")
+    print(f"[+] Custom LinReg fit seconds: {t1 - t0:.3f}")
+    print(f"[+] Custom LinReg Mean Squared Error: {mse}")
+    print(f"[+] Custom LinReg Root Mean Squared Error: {rmse}")
+    print(f"[+] Custom LinReg Mean Absolute Error: {mae}")
+    if y_std != 0.0:
+        print(f"[+] Custom LinReg MAE/std(y): {mae / y_std}")
+        print(f"[+] Custom LinReg RMSE/std(y): {rmse / y_std}")
+    print(f"[+] Custom LinReg R2 Score: {r2_score(ts_y, preds)}")
+
+    skl = SklearnLinearRegression(fit_intercept=True)
+    t2 = time.perf_counter()
+    skl.fit(tr_x, tr_y)
+    t3 = time.perf_counter()
+    skl_preds = skl.predict(ts_x)
+    print(f"\n[+] Sklearn LinReg fit seconds: {t3 - t2:.3f}")
+    print(f"[+] Sklearn LinReg Mean Squared Error: {mean_squared_error(ts_y, skl_preds)}")
+    print(f"[+] Sklearn LinReg Mean Absolute Error: {mean_absolute_error(ts_y, skl_preds)}")
+    print(f"[+] Sklearn LinReg R2 Score: {r2_score(ts_y, skl_preds)}")
 
 main()
 
