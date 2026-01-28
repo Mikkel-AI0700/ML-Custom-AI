@@ -13,11 +13,45 @@ from sklearn.datasets import (
 )
 
 def _read_generator_configuration (json_configuration_path: Path):
+    """Read a JSON generator configuration file.
+
+    Parameters
+    ----------
+    json_configuration_path : pathlib.Path
+        Path to a JSON file containing keyword arguments for a scikit-learn
+        dataset generator.
+
+    Returns
+    -------
+    dict
+        Parsed configuration dictionary.
+    """
     with json_configuration_path.open("r") as config_path:
         dataset_configuration_dict = json.load(config_path)
     return dataset_configuration_dict
 
 def _write_to_file (filepath: Path, X: pd.DataFrame, Y: pd.DataFrame):
+    """Split `X`/`Y` into train/test and write them as CSV files.
+
+    Parameters
+    ----------
+    filepath : pathlib.Path
+        Output directory where the CSV files will be written.
+    X : pandas.DataFrame
+        Feature dataset.
+    Y : pandas.DataFrame
+        Target/label dataset.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    This function prints a message for files matching the pattern
+    ``(train|test)_(x|y)_dataset.csv`` in the output directory, but it does not
+    delete those files.
+    """
     for directory_content in os.listdir(filepath):
         if re.findall(r"(train|test)_(x|y)_dataset.csv", directory_content):
             print(f"[*] Removed: {directory_content}")
@@ -39,6 +73,26 @@ def _write_to_file (filepath: Path, X: pd.DataFrame, Y: pd.DataFrame):
         dataset.to_csv(os.path.join(filepath, data_filename), index=False)
 
 def _change_configuration (config_key_value: str, generator_configuration: dict[str, Any]):
+    """Update a generator configuration dictionary from a key/value string.
+
+    Parameters
+    ----------
+    config_key_value : str
+        Comma-separated list of assignments, e.g. ``"n_samples=200, n_features=5"``.
+        If `None`, no changes are applied.
+    generator_configuration : dict[str, Any]
+        Configuration dictionary to update.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    SystemExit
+        Exits with status code ``1`` if an unknown configuration key is
+        provided.
+    """
     try:
         if config_key_value is None:
             return
@@ -60,6 +114,21 @@ def create_regression (
     regressor_config: Path, 
     key_value_config: dict[str, Any]
 ):
+    """Generate a regression dataset and write train/test CSV files.
+
+    Parameters
+    ----------
+    dataset_gen_path : pathlib.Path
+        Output directory for generated CSV files.
+    regressor_config : pathlib.Path
+        JSON configuration path for `sklearn.datasets.make_regression`.
+    key_value_config : str or None
+        Optional key/value override string passed to `_change_configuration`.
+
+    Returns
+    -------
+    None
+    """
     regressor_configuration = _read_generator_configuration(regressor_config)
     _change_configuration(key_value_config, regressor_configuration)
     X, Y = make_regression(**regressor_configuration)
@@ -70,6 +139,21 @@ def create_classification (
     classification_config: Path, 
     key_value_config: dict[str, Any]
 ):
+    """Generate a classification dataset and write train/test CSV files.
+
+    Parameters
+    ----------
+    dataset_gen_path : pathlib.Path
+        Output directory for generated CSV files.
+    classification_config : pathlib.Path
+        JSON configuration path for `sklearn.datasets.make_classification`.
+    key_value_config : str or None
+        Optional key/value override string passed to `_change_configuration`.
+
+    Returns
+    -------
+    None
+    """
     classification_configuration = _read_generator_configuration(classification_config)
     _change_configuration(key_value_config, classification_configuration)
     X, Y = make_classification(**classification_configuration)
@@ -80,6 +164,21 @@ def create_clustering (
     clustering_config: Path, 
     key_value_config: dict[str, Any]
 ):
+    """Generate a clustering dataset and write train/test CSV files.
+
+    Parameters
+    ----------
+    dataset_gen_path : pathlib.Path
+        Output directory for generated CSV files.
+    clustering_config : pathlib.Path
+        JSON configuration path for `sklearn.datasets.make_blobs`.
+    key_value_config : str or None
+        Optional key/value override string passed to `_change_configuration`.
+
+    Returns
+    -------
+    None
+    """
     clustering_configuration = _read_generator_configuration(clustering_config)
     _change_configuration(key_value_config, clustering_configuration)
     X, Y = make_blobs(**clustering_configuration)
@@ -87,6 +186,20 @@ def create_clustering (
 
 
 def main ():
+    """Entry point for the dataset generator CLI.
+
+    Parses command-line arguments and generates datasets in one of three modes:
+    regression, classification, or clustering.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    SystemExit
+        Exits with status code ``1`` on invalid arguments.
+    """
     BASE_PATH = Path(__file__).resolve().parent.parent
 
     regressor_dataset_path = BASE_PATH / "test-data/regression-data"
