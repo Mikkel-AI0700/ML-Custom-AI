@@ -4,13 +4,13 @@
 PYTHONPATH="/home/mikkel/Desktop/ai-projects/machine-learning/custom-ai"
 
 # Generator compiler paths
-DATASET_GENERATOR_VENV="${PYTHON_TLD}/python-utilities/generator-venv"
-DATASET_GENERATOR_PATH="${PYTHON_TLD}/python-utilities/generator-files/generator.py"
+DATASET_GENERATOR_VENV="${PYTHONPATH}/python-utilities/generator-venv"
+DATASET_GENERATOR_PATH="${PYTHONPATH}/python-utilities/generator-files/generator.py"
 
 # Machine learning algorithms path
-LIN_REG_SOURCE="${PYTHON_TLD}/linear-regression/source-file/linear-regression.py"
-LOG_REG_SOURCE="${PYTHON_TLD}/logistic-regression/source-files/logistic-regression.py"
-TREE_SOURCE="${PYTHON_TLD}/decision-tree/source-code/tree.py"
+LIN_REG_SOURCE="${PYTHONPATH}/linear-regression/source-file/linear-regression.py"
+LOG_REG_SOURCE="${PYTHONPATH}/logistic-regression/source-files/logistic-regression.py"
+TREE_SOURCE="${PYTHONPATH}/decision-tree/source-code/tree.py"
 
 # Global Top Level Domain and VENV checks
 main_tld_passed=0
