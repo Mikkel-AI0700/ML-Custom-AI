@@ -220,7 +220,7 @@ class LinearRegression:
 
         self._initialize_weights_bias(train_x)
         for epoch in range(self.epochs):
-            print(f"Batch: {epoch + 1} | M: {self.partial_derivative_m} | B: {self.partial_derivative_b}")
+            print(f"Epoch: {epoch + 1} | M: {self.partial_derivative_m} | B: {self.partial_derivative_b}")
             
             # Main training loop
             predictions = np.dot(train_x, self.partial_derivative_m) + self.partial_derivative_b
@@ -295,8 +295,8 @@ def main ():
     print(f"[+] Custom LinReg Root Mean Squared Error: {rmse}")
     print(f"[+] Custom LinReg Mean Absolute Error: {mae}")
     if y_std != 0.0:
-        print(f"[+] Custom LinReg MAE/std(y): {mae / y_std}")
-        print(f"[+] Custom LinReg RMSE/std(y): {rmse / y_std}")
+        print(f"[+] Custom LinReg MAE/std(y): {100 * (mae / y_std):.2f}%")
+        print(f"[+] Custom LinReg RMSE/std(y): {100 * (rmse / y_std):.2f}%")
     print(f"[+] Custom LinReg R2 Score: {r2_score(ts_y, preds)}")
 
     skl = SklearnLinearRegression(fit_intercept=True)
