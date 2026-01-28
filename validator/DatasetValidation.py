@@ -1,5 +1,4 @@
-from typing import Union, Callable
-from inspect import signature
+from typing import Union
 import numpy as np
 import pandas as pd
 from errors.DatasetErrors import (
@@ -16,101 +15,100 @@ EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 
 class DatasetValidation:
-    """Validate dataset existence, shapes, dtypes, and numeric sanity.
+    """Dataset validation utilities.
 
-    The validator collects references to datasets that fail specific checks
-    (non-existent / non-NumPy, containing infinities, containing NaNs). Public
-    validation methods print errors and terminate the process on failure.
+    Provides a small set of validation helpers for dataset-like inputs used
+    throughout the project.
 
-    Attributes:
-        datasets_with_infinity (list[np.ndarray]): Datasets found (or reported) to contain `inf`.
-        datasets_with_nan (list[np.ndarray]): Datasets found (or reported) to contain `NaN`.
-        datasets_with_non (list[np.ndarray]): Inputs found (or reported) to be non-existent/non-NumPy.
+    The methods follow a *fail-fast* approach: on failure they print a
+    domain-specific exception message and terminate the process with
+    ``EXIT_FAILURE``.
+
+    Notes
+    -----
+    Context-aware validation
+        Not every stage in the project operates on both features and targets.
+        For example, inference and transformer pipelines may validate only
+        ``X``.
+
+        Several methods therefore accept ``Y`` as ``None`` and interpret that
+        as "validate only X". This makes it possible to keep a uniform
+        ``(X, Y)`` call signature (consistent architecture/pipeline assembly)
+        while still supporting single-input validation.
     """
 
-    def __init__ (self):
-        self.datasets_with_infinity = []
-        self.datasets_with_nan = []
-        self.datasets_with_non = []
+    def check_existence (self, X: np.ndarray, Y: Union[np.ndarray | None]):
+        """Validate that required dataset inputs are present.
 
-    def __check_non (self, X: list[np.ndarray]):
-        """Record datasets that are not NumPy arrays.
+        This check is *context-aware*:
 
-        Args:
-            X (list[np.ndarray]): A list of dataset-like objects to inspect.
+        - If ``Y`` is provided (not ``None``), both ``X`` and ``Y`` must be
+          present (not ``None``).
+        - If ``Y`` is ``None``, only ``X`` is required.
 
-        Notes:
-            This helper appends any non-`np.ndarray` items to `datasets_with_non`.
-        """
-        for dataset in X:
-            if not any(isinstance(dataset, np.ndarray)):
-                self.datasets_with_non.append(dataset)
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature/primary input dataset.
+        Y : numpy.ndarray or None
+            Optional target/secondary dataset.
 
-    def __check_inf (self, X: list[np.ndarray]):
-        """Record datasets that contain infinity values.
+            Passing ``None`` indicates that this validation step is being run
+            in a context where only ``X`` exists/should be validated (e.g.
+            inference or transformer-only pipelines).
 
-        Args:
-            X (list[np.ndarray]): A list of NumPy arrays to inspect.
+        Returns
+        -------
+        bool
+            ``True`` if the required inputs for the given context are present.
 
-        Notes:
-            This helper appends any datasets that are detected to contain `inf`
-            to `datasets_with_infinity`.
-        """
-        for dataset in X:
-            if np.isinf(dataset):
-                self.datasets_with_infinity.append(dataset)
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``NonExistentDataset`` if
+            a required input is missing.
 
-    def __check_nan (self, X: list[np.ndarray]):
-        """Record datasets that contain NaN values.
-
-        Args:
-            X (list[np.ndarray]): A list of NumPy arrays to inspect.
-
-        Notes:
-            This helper appends any datasets that are detected to contain NaNs
-            to `datasets_with_nan`.
-        """
-        for dataset in X:
-            if np.isnan(dataset):
-                self.datasets_with_nan.append(dataset)
-
-    def check_existence (self, X: list[np.ndarray], Y: None):
-        """Check that provided datasets exist and are NumPy arrays.
-
-        Args:
-            X (list[np.ndarray]): One or more datasets to validate.
-            Y (None): Unused parameter (kept for a uniform validation-call signature).
-
-        Returns:
-            None: This method does not return a value.
-
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing a `NonExistentDataset`
-                message if any dataset is considered non-existent/non-NumPy.
+        Notes
+        -----
+        Despite the name, this method currently checks presence (``is not
+        None``) rather than enforcing a strict ``numpy.ndarray`` type.
         """
         try:
-            map(self.__check_non, X)
-            if len(self.datasets_with_non) > 0:
-                raise NonExistentDataset(self.datasets_with_non)
+            if X is not None and Y is not None:
+                return True
+            elif X is not None:
+                return True
+            else:
+                raise NonExistentDataset(X, Y)
         except NonExistentDataset as ned_message:
             print(ned_message)
             exit(EXIT_FAILURE)
 
     def check_shapes (self, X: np.ndarray, Y: np.ndarray):
-        """Check that `X` and `Y` have the same first dimension length.
+        """Validate that ``X`` and ``Y`` share the same sample count.
 
-        Args:
-            X (np.ndarray): Feature dataset.
-            Y (np.ndarray): Label/target dataset.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature dataset.
+        Y : numpy.ndarray
+            Target/label dataset.
 
-        Returns:
-            bool: `True` if `X.shape[0] == Y.shape[0]`.
+        Returns
+        -------
+        bool
+            ``True`` if ``X.shape[0] == Y.shape[0]``.
 
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing an `UnequalShapesException`
-                message if the leading dimensions differ.
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``UnequalShapesException``
+            if the leading dimensions differ.
         """
         try:
+            if Y is None:
+                return True
+
             if X.shape[0] != Y.shape[0]:
                 raise UnequalShapesException(X, Y)
             else:
@@ -119,40 +117,54 @@ class DatasetValidation:
             print(use_message)
             exit(EXIT_FAILURE)
 
-    def check_1D (self, X: np.ndarray):
-        """Check that `X` is a 1-dimensional NumPy array.
+    def check_1D (self, X: np.ndarray, Y: None):
+        """Validate that ``X`` is 1-dimensional.
 
-        Args:
-            X (np.ndarray): Dataset to validate.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset to validate.
+        Y : None
+            Placeholder parameter to keep a consistent ``(X, Y)`` validator
+            signature. Not used by this check.
 
-        Returns:
-            None: This method does not return a value.
-
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing a `Not1DDataset`
-                message if `X.ndim != 1`.
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``Not1DDataset`` if
+            ``X.ndim != 1``.
         """
         try:
+            if Y is None:
+                return True
+
             if X.ndim != 1:
                 raise Not1DDataset(X)
         except Not1DDataset as dataset_1d_error:
             print(dataset_1d_error)
             exit(EXIT_FAILURE)
 
-    def check_2D (self, X: np.ndarray):
-        """Check that `X` is a 2-dimensional NumPy array.
+    def check_2D (self, X: np.ndarray, Y: None):
+        """Validate that ``X`` is 2-dimensional.
 
-        Args:
-            X (np.ndarray): Dataset to validate.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Dataset to validate.
+        Y : None
+            Placeholder parameter to keep a consistent ``(X, Y)`` validator
+            signature. Not used by this check.
 
-        Returns:
-            None: This method does not return a value.
-
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing a `Not2DDataset`
-                message if `X.ndim != 2`.
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``Not2DDataset`` if
+            ``X.ndim != 2``.
         """
         try:
+            if Y is None:
+                return True
+
             if X.ndim != 2:
                 raise Not2DDataset(X)
         except Not2DDataset as dataset_2d_error:
@@ -160,20 +172,30 @@ class DatasetValidation:
             exit(EXIT_FAILURE)
 
     def check_datatypes (self, X: np.ndarray, Y: np.ndarray):
-        """Check that `X` and `Y` have the same NumPy dtype.
+        """Validate dtype compatibility between ``X`` and ``Y``.
 
-        Args:
-            X (np.ndarray): Feature dataset.
-            Y (np.ndarray): Label/target dataset.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature dataset.
+        Y : numpy.ndarray
+            Target/label dataset.
 
-        Returns:
-            bool: `True` if `X.dtype == Y.dtype`.
+        Returns
+        -------
+        bool
+            ``True`` if ``X.dtype == Y.dtype``.
 
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing an `UnequalDatatypesException`
-                message if the dtypes differ.
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``UnequalDatatypesException``
+            if dtypes differ.
         """
         try:
+            if Y is None:
+                return True
+
             if X.dtype != Y.dtype:
                 raise UnequalDatatypesException(X, Y)
             else:
@@ -182,68 +204,117 @@ class DatasetValidation:
             print(ude_message.format(ude_message))
             exit(EXIT_FAILURE)
 
-    def infinity_checks (self, X: list[np.ndarray], Y: None):
-        """Check that datasets do not contain infinity values.
+    def infinity_checks (self, X: np.ndarray, Y: Union[np.ndarray | None]):
+        """Validate that inputs do not contain infinity values.
 
-        Args:
-            X (list[np.ndarray]): One or more datasets to validate.
-            Y (None): Unused parameter (kept for a uniform validation-call signature).
+        This check is *context-aware*:
 
-        Returns:
-            bool: `True` if no infinities are detected.
+        - If ``Y`` is provided (not ``None``), both ``X`` and ``Y`` are checked.
+        - If ``Y`` is ``None``, only ``X`` is checked.
 
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing an `InfinityException`
-                message if any dataset is detected to contain infinity values.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature/primary dataset to validate.
+        Y : numpy.ndarray or None
+            Optional target/secondary dataset.
+
+        Returns
+        -------
+        bool
+            ``True`` if the required inputs for the given context contain no
+            infinities.
+
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``InfinityException`` if
+            the check detects infinity values in a required input.
         """
         try:
-            map(self.__check_inf, X)
-            if len(self.datasets_with_infinity) > 0:
-                raise InfinityException(self.datasets_with_infinity)
-            else:
+            if (Y is not None and
+                not np.any(np.isinf(X)) and
+                not np.any(np.isinf(Y))
+            ):
                 return True
+            elif not np.any(np.isinf(X)):
+                return True
+            else:
+                raise InfinityException()
         except InfinityException as ie_exception:
             print(ie_exception)
             exit(EXIT_FAILURE)
 
-    def nan_checks (self, X: list[np.ndarray]):
-        """Check that datasets do not contain NaN values.
+    def nan_checks (self, X: np.ndarray, Y: Union[np.ndarray | None]):
+        """Validate that inputs do not contain NaN values.
 
-        Args:
-            X (list[np.ndarray]): One or more datasets to validate.
+        This check is *context-aware*:
 
-        Returns:
-            bool: `True` if no NaNs are detected.
+        - If ``Y`` is provided (not ``None``), both ``X`` and ``Y`` are checked.
+        - If ``Y`` is ``None``, only ``X`` is checked.
 
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` after printing a `NaNException`
-                message if any dataset is detected to contain NaN values.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature/primary dataset to validate.
+        Y : numpy.ndarray or None
+            Optional target/secondary dataset.
+
+        Returns
+        -------
+        bool
+            ``True`` if the required inputs for the given context contain no
+            NaNs.
+
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` after printing ``NaNException`` if the
+            check detects NaN values in a required input.
         """
         try:
-            map(self.__check_nan, X)
-            if len(self.datasets_with_nan) > 0:
-                raise NaNException(self.datasets_with_nan)
-            else:
+            if (Y is not None and
+                not np.any(np.isnan(X)) and
+                not np.any(np.isnan(Y))
+            ):
                 return True
+            elif not np.any(np.isnan(X)):
+                return True
+            else:
+                raise NaNException()
         except NaNException as nan_exception:
             print(nan_exception)
             exit(EXIT_FAILURE)
 
-    def perform_dataset_validation (self, X: np.ndarray, Y: np.ndarray):
-        """Run a standard sequence of validation checks for `X` and `Y`.
+    def perform_dataset_validation (self, X: np.ndarray, Y: Union[np.ndarray | None]):
+        """Run the standard dataset validation pipeline.
 
-        The following checks are performed in order:
-        existence, shape compatibility, dtype compatibility, infinity checks, NaN checks.
+        The following checks are performed, in order:
 
-        Args:
-            X (np.ndarray): Feature dataset (or datasets, depending on usage in checks).
-            Y (np.ndarray): Label/target dataset.
+        1. Existence / NumPy type checks
+        2. Shape compatibility
+        3. Dtype compatibility
+        4. Infinity checks
+        5. NaN checks
 
-        Returns:
-            None: This method does not return a value.
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature dataset.
+        Y : numpy.ndarray
+            Target/label dataset.
 
-        Raises:
-            SystemExit: Exits with `EXIT_FAILURE` if any delegated validation check fails.
+        Notes
+        -----
+        This method is intended for supervised training where both ``X`` and
+        ``Y`` are present. For single-input contexts (e.g. inference), call the
+        individual context-aware checks directly (or supply ``Y=None`` where
+        supported).
+
+        Raises
+        ------
+        SystemExit
+            Exits with ``EXIT_FAILURE`` if any delegated validation check fails.
         """
         validation_checks_list = (
             self.check_existence,
