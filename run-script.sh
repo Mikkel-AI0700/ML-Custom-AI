@@ -23,7 +23,7 @@ function check_tld_venv () {
         # Set the PYTHON_TLD
         {
             export PYTHONPATH="${PYTHONPATH}" &&
-            echo "[+] PYTHON_TLD is now set: $(echo $PYTHONPATH)" &&
+            echo "[+] PYTHONPATH is now set" &&
             main_tld_passed=1;
         } || {
             echo "[-] Unable to set PYTHON_TLD" &&
@@ -73,7 +73,6 @@ function execute_model () {
     for algorithm in "${!machine_learning_algorithms[@]}"; do
         algorithm_source="${machine_learning_algorithms[${algorithm}]}"
         if [[ "${algorithm}" == "${algorithm_to_use}" ]]; then
-            echo "[+] Running: ${algorithm_source}"
             python3 "${algorithm_source}"
         fi
     done
