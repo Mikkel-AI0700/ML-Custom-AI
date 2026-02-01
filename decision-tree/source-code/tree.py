@@ -394,11 +394,11 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                         num_feat,
                         threshold,
                         X[X[:, num_feat] > threshold],
-                        X[X[:, num_feat] < threshold]
+                        X[X[:, num_feat] <= threshold]
                     )
         if categorical_features is not None:
             for cat_feat in categorical_features:
-                for unique_feat in np.nditer(np.unique(X[:, cat_feat])):
+                for unique_feat in np.unique(X[:, cat_feat]):
                     yield (
                         "categorical",
                         cat_feat,
@@ -519,7 +519,16 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         best_computed_right_split: np.ndarray = None
 
         # Tree depth & min_samples_split hyperparameter check
-        if recursive_tree_depth == self.max_depth or len(X) <= self.min_samples_split:
+        if recursive_tree_depth == self.max_depth:
+            print(f"[*] Stopping training, condition hit: Max depth")
+            leaf_node = self._create_node(
+                computed_class_probabilities=self._compute_class_probability(X), 
+                create_leaf_node=True
+            )
+            return leaf_node
+        
+        if len(X) <= self.min_samples_split:
+            print(f"[*] Stopping training, condition hit: Minimum samples split")
             leaf_node = self._create_node(
                 computed_class_probabilities=self._compute_class_probability(X), 
                 create_leaf_node=True
@@ -553,6 +562,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         # min_information_gain hyperparameter check
         if best_computed_information_gain < self.min_information_gain:
+            print(f"[*] Stopping training, condition hit: Minimum information gain")
             instantiated_leaf_node = self._create_node(
                 computed_class_probabilities=self._compute_class_probability(X), 
                 create_leaf_node=True
@@ -560,14 +570,17 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             return instantiated_leaf_node
 
         # min_samples_leaf hyperparameter check
-        if (best_computed_left_split.shape[0] < self.min_samples_leaf or
-            best_computed_right_split.shape[0] < self.min_samples_leaf
+        if (best_computed_left_split is not None and
+            best_computed_right_split is not None
         ):
-            instantiated_leaf_node = self._create_node(
-                computed_class_probabilities=self._compute_class_probability(X), 
-                create_leaf_node=True
-            )
-            return instantiated_leaf_node
+            if (best_computed_left_split.shape[0] < self.min_samples_leaf or
+                best_computed_right_split.shape[0] < self.min_samples_leaf
+            ):
+                instantiated_leaf_node = self._create_node(
+                    computed_class_probabilities=self._compute_class_probability(X), 
+                    create_leaf_node=True
+                )
+                return instantiated_leaf_node
 
         instantiated_decision_node = self._create_node(
             split_index=best_index,
@@ -632,6 +645,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         None
             This estimator is fitted in-place.
         """
+        self._local_rng = np.random.default_rng(42)
         self._dset_validator.validate_existence(X)
         self._dset_validator.validate_types(X)
         self._root_node = self._build_decision_tree(X)
