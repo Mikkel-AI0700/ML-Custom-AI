@@ -493,7 +493,6 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         if create_leaf_node:
             instantiated_leaf_node = LeafNode(computed_class_probabilities)
-            instantiated_leaf_node._leaf_node_amount = instantiated_leaf_node._leaf_node_amount + 1
             instantiated_leaf_node._node_is_leaf = True
             return instantiated_leaf_node
 
@@ -548,7 +547,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                     best_unique_split_condition = condition
                     best_computed_left_split = group_above_condition
                     best_computed_right_split = group_below_condition
-                    best_unique_split_condition = None
+                    best_num_split_condition = None
                 else:
                     continue
 
@@ -578,8 +577,14 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             create_decision_node=True
         )
 
-        instantiated_decision_node._left_node = self._build_decision_tree(best_computed_left_split, recursive_tree_depth + 1)
-        instantiated_decision_node._right_node = self._build_decision_tree(best_computed_right_split, recursive_tree_depth + 1)
+        instantiated_decision_node._left_node = self._build_decision_tree(
+            best_computed_left_split, 
+            recursive_tree_depth + 1
+        )
+        instantiated_decision_node._right_node = self._build_decision_tree(
+            best_computed_right_split, 
+            recursive_tree_depth + 1
+        )
 
         return instantiated_decision_node
 
@@ -599,19 +604,20 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             ``(is_leaf, predicted_class)`` where ``is_leaf`` is a boolean flag
             and ``predicted_class`` is the class index (argmax at the leaf).
         """
-        while root_node._node_is_decision:
-            if root_node._feat_num_condition and X[root_node._split_index] > root_node._feat_num_condition:
-                self._inference_traversal_tree(X, root_node._left_node)
-            else:
-                self._inference_traversal_tree(X, root_node._right_node)
+        if root_node._node_is_leaf:
+            return True, root_node.compute_argmax()
 
-            if root_node._feat_cat_condition and X[root_node._split_index] == root_node._feat_cat_condition:
-                self._inference_traversal_tree(X, root_node._left_node)
+        if root_node._feat_num_condition is not None:
+            if X[root_node._split_index] > root_node._feat_num_condition:
+                return self._inference_traversal_tree(X, root_node._left_node)
             else:
-                self._inference_traversal_tree(X, root_node._right_node)
-
-            if root_node._node_is_leaf:
-                return True, root_node.compute_argmax()
+                return self._inference_traversal_tree(X, root_node._right_node)
+            
+        if root_node._feat_cat_condition is not None:
+            if X[root_node._split_index] == root_node._feat_cat_condition:
+                return self._inference_traversal_tree(X, root_node._left_node)
+            else:
+                return self._inference_traversal_tree(X, root_node._right_node)
 
     def fit (self, X: np.ndarray):
         """Fit the decision tree classifier.
