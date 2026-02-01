@@ -45,6 +45,7 @@ class DecisionNode:
         information_gain: float
     ):
         self._node_is_decision = True
+        self._node_is_leaf = False
         self._split_index = split_index
         self._feat_num_condition = split_feat_num_condition
         self._feat_cat_condition = split_feat_cat_condition
@@ -69,8 +70,8 @@ class LeafNode:
         Stored probability vector for the leaf.
     """
     def __init__ (self, computed_probabilities: np.ndarray):
+        self._node_is_decision = False
         self._node_is_leaf = True
-        self._leaf_node_amount = 0
         self.tree_computed_probabilities = computed_probabilities
 
     def compute_argmax (self):
@@ -326,7 +327,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         else:
             return self._compute_log_loss() # WARNING: Very volatile code. Don't be stupid and run this line ;)
     
-    def _determine_feature_split_metric (self, X: np.ndarray) -> np.ndarray:
+    def _determine_feature_split_metric (self, feature_list: list[int], local_rng: np.random.Generator) -> np.ndarray:
         """Choose which feature indices to consider for splitting.
 
         Parameters
@@ -346,20 +347,21 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         The current implementation special-cases the string values ``'sqrt'``
         and ``'log2'``.
         """
-        feature_indices_range = list(range(X.shape[1] - 1))
+        if feature_list is None:
+            return None
 
-        if self.max_depth == "sqrt":
-            feature_indices = np.random.choice(
-                feature_indices_range, 
-                size=int(np.sqrt(len(feature_indices_range)))
+        if self.max_features == "sqrt":
+            feature_indices = local_rng.random(
+                feature_list,
+                size=int(np.sqrt(len(feature_list)))
             )
-        elif self.max_depth == "log2":
-            feature_indices = np.random.choice(
-                feature_indices_range, 
-                size=int(np.log2(len(feature_indices_range)))
+        elif self.max_features == "log2":
+            feature_indices = local_rng.random(
+                feature_list,
+                size=int(np.log2(len(feature_list)))
             )
         else:
-            feature_indices = feature_indices_range
+            feature_indices = feature_list
 
         return feature_indices
     
@@ -382,7 +384,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             ``(feat_type, feat_index, condition, left_subset, right_subset)``.
             ``feat_type`` is either ``'numerical'`` or ``'categorical'``.
         """
-        if numeric_features:
+        if numeric_features is not None:
             for num_feat in numeric_features:
                 unique_values = np.unique(X[:, num_feat])
                 computed_midpoint_thresholds = (unique_values[:-1] + unique_values[1:]) / 2
@@ -394,7 +396,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                         X[X[:, num_feat] > threshold],
                         X[X[:, num_feat] < threshold]
                     )
-        if categorical_features:
+        if categorical_features is not None:
             for cat_feat in categorical_features:
                 for unique_feat in np.nditer(np.unique(X[:, cat_feat])):
                     yield (
@@ -432,27 +434,19 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                 ``(feat_type, feat_index, condition, left_subset, right_subset)``
                 which is forwarded to ``_build_decision_tree``.
         """
-        if self.categorical_features:
-            numeric_dataset = X[:, [self.numerical_features]]
-            categorical_dataset = X[:, [self.categorical_features]]
-        else:
-            numeric_dataset = X[:, [self.numerical_features]]
-
-        if self.split_metric and self.categorical_features:
-            numeric_features = self._determine_feature_split_metric(numeric_dataset)
-            categorical_features = self._determine_feature_split_metric(categorical_dataset)
-        else:
-            numeric_features = self._determine_feature_split_metric(X)
-
-        yield from self._split_yield(X, numeric_features, categorical_features)
+        yield from self._split_yield(
+            X,
+            self._determine_feature_split_metric(self.numerical_features),
+            self._determine_feature_split_metric(self.categorical_features)
+        )
 
     def _create_node (
         self,
-        split_index: int,
-        split_num_condition: Union[int, float],
-        split_cat_condition: Union[int, float],
-        information_gain: float,
-        computed_class_probabilities: np.ndarray,
+        split_index: int = None,
+        split_num_condition: Union[int, float] = None,
+        split_cat_condition: Union[int, float] = None,
+        information_gain: float = None,
+        computed_class_probabilities: np.ndarray = None,
         create_decision_node: bool = False,
         create_leaf_node: bool = False,
     ) -> Union[DecisionNode, LeafNode]:
