@@ -1,9 +1,7 @@
 from typing import Any, Union
-from pathlib import Path
-import sys
 import numpy as np
 import pandas as pd
-from validator.validator import DatasetValidation
+from validator.DatasetValidation import DatasetValidation
 from validator import ParameterValidator
 from base.BaseEstimator import BaseEstimator
 from base.ClassifierMixin import ClassifierMixin
@@ -180,6 +178,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         self.random_state = random_state
         self._root_node: Union[DecisionNode, LeafNode] = None
         self._unique_classes = None
+        self._classes_to_index = {}
         self._probability_vector = None
         self._classes_to_index = None
         self._dset_validator = DatasetValidation()
@@ -206,16 +205,21 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         This method returns the probabilities in the order produced by
         ``numpy.unique``.
         """
-        if self._unique_classes == None:
-            self._unique_classes = None
-            self._probability_vector = np.zeros(X, dtype=np.float32)
+        labels, label_counts = np.unique(X, return_counts=True)
+        probability_vector = None
 
-        for index, label in enumerate(np.unique(X)):
-            self._classes_to_index.update({label: index})
+        if self._unique_classes is None:
+            self._unique_classes = np.asarray(labels)
+            probability_vector = np.zeros(len(labels), dtype=np.float32)
 
-        for label, label_counts in enumerate(np.unique(X, return_counts=True)):
+            for index, label in enumerate(labels):
+                self._classes_to_index.update({label: index})
+        else:
+            probability_vector = np.zeros(len(self._unique_classes))
+
+        for label, label_count in zip(labels, label_counts):
             if label in self._classes_to_index.keys():
-                self._probability_vector[self._classes_to_index.get(label)] = label_counts / len(X)
+                probability_vector[self._classes_to_index.get(label)] = label_count / len(X)
     
     def _compute_impurity (self, X: np.ndarray) -> np.float32:
         """Compute the Gini impurity for a dataset.
@@ -257,8 +261,9 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         numpy.float32
             Entropy.
         """
-        unique_probabilities = self._compute_class_probability(X)
-        computed_entropy = -(np.sum(unique_probabilities * np.log2(unique_probabilities)))
+        probability_vector = self._compute_class_probability(X)
+        probability_vector = probability_vector[probability_vector > 0.0]
+        computed_entropy = -(np.sum(probability_vector * np.log2(probability_vector)))
         return computed_entropy
     
     def _compute_log_loss (self, Y_true: np.ndarray, Y_probabilities: np.ndarray) -> np.float32:
@@ -544,7 +549,11 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         for feat_type, feat_index, condition, group_above_condition, group_below_condition in self._split_data(X):
             if feat_type == "numerical":
-                num_feat_information_gain = self._compute_information_gain(X, group_above_condition, group_below_condition)
+                num_feat_information_gain = self._compute_information_gain(
+                    X, 
+                    group_above_condition, 
+                    group_below_condition
+                )
                 if num_feat_information_gain > best_computed_information_gain:
                     best_index = feat_index
                     best_computed_information_gain = num_feat_information_gain
@@ -556,7 +565,12 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                     continue
 
             if feat_type == "categorical":
-                cat_feat_information_gain = self._compute_information_gain(X, group_above_condition, group_below_condition)
+                cat_feat_information_gain = self._compute_information_gain(
+                    X, 
+                    group_above_condition, 
+                    group_below_condition
+                )
+
                 if cat_feat_information_gain > best_computed_information_gain:
                     best_index = feat_index
                     best_computed_information_gain = cat_feat_information_gain
@@ -666,8 +680,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             This estimator is fitted in-place.
         """
         self._local_rng = np.random.default_rng(self.random_state)
-        self._dset_validator.validate_existence(X)
-        self._dset_validator.validate_types(X)
+        self._dset_validator.perform_dataset_validation(X)
         self._root_node = self._build_decision_tree(X)
 
     def predict (self, X: np.ndarray):
@@ -684,6 +697,10 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             Predicted class indices.
         """
         inferenced_elements_array = []
+
+        if self._unique_classes is None:
+            raise RuntimeError("[-] Error: The DecisionTreeClassifier has not been fitted yet")
+
         for row in X:
             leaf_node, predicted_class = self._inference_traversal_tree(row, self._root_node)
             if leaf_node:
