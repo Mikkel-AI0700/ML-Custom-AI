@@ -221,7 +221,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             if label in self._classes_to_index.keys():
                 probability_vector[self._classes_to_index.get(label)] = label_count / len(Y)
     
-    def _compute_impurity (self, X: np.ndarray) -> np.float32:
+    def _compute_impurity (self, Y: np.ndarray) -> np.float32:
         """Compute the Gini impurity for a dataset.
 
         Uses the definition:
@@ -231,7 +231,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
+        Y : numpy.ndarray
             Dataset (or subset) including labels in the last column.
 
         Returns
@@ -239,21 +239,21 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         numpy.float32
             Gini impurity.
         """
-        probability_vector = self._compute_class_probability(X)
+        probability_vector = self._compute_class_probability(Y)
         computed_impurity = 1 - np.sum(np.square(probability_vector))
         return computed_impurity
     
-    def _compute_entropy (self, X: np.ndarray) -> np.float32:
+    def _compute_entropy (self, Y: np.ndarray) -> np.float32:
         """Compute the Shannon entropy for a dataset.
 
         Uses the definition:
 
         .. math::
-            H(X) = -Σ p(xᵢ) * log₂(p(xᵢ))
+            H(Y) = -Σ p(xᵢ) * log₂(p(xᵢ))
 
         Parameters
         ----------
-        X : numpy.ndarray
+        Y : numpy.ndarray
             Dataset (or subset) including labels in the last column.
 
         Returns
@@ -261,7 +261,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         numpy.float32
             Entropy.
         """
-        probability_vector = self._compute_class_probability(X)
+        probability_vector = self._compute_class_probability(Y)
         probability_vector = probability_vector[probability_vector > 0.0]
         computed_entropy = -(np.sum(probability_vector * np.log2(probability_vector)))
         return computed_entropy
