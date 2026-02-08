@@ -456,6 +456,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         """
         yield from self._split_yield(
             X,
+            Y,
             self._determine_feature_split_metric(self.numerical_features),
             self._determine_feature_split_metric(self.categorical_features)
         )
@@ -542,7 +543,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         if recursive_tree_depth == self.max_depth:
             print(f"[*] Stopping training, condition hit: Max depth")
             leaf_node = self._create_node(
-                computed_class_probabilities=self._compute_class_probability(X), 
+                computed_class_probabilities=self._compute_class_probability(Y), 
                 create_leaf_node=True
             )
             return leaf_node
@@ -550,12 +551,12 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         if len(X) <= self.min_samples_split:
             print(f"[*] Stopping training, condition hit: Minimum samples split")
             leaf_node = self._create_node(
-                computed_class_probabilities=self._compute_class_probability(X), 
+                computed_class_probabilities=self._compute_class_probability(Y), 
                 create_leaf_node=True
             )
             return leaf_node
 
-        for feat_type, feat_index, condition, group_above_condition, group_below_condition in self._split_data(X):
+        for feat_type, feat_index, condition, group_above_condition, group_below_condition in self._split_data(X, Y):
             if feat_type == "numerical":
                 num_feat_information_gain = self._compute_information_gain(
                     X, 
@@ -605,7 +606,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         if best_computed_information_gain < self.min_information_gain:
             print(f"[*] Stopping training, condition hit: Minimum information gain")
             instantiated_leaf_node = self._create_node(
-                computed_class_probabilities=self._compute_class_probability(X), 
+                computed_class_probabilities=self._compute_class_probability(Y), 
                 create_leaf_node=True
             )
             return instantiated_leaf_node
@@ -619,7 +620,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             ):
                 print(f"[*] Stopping training, condition hit: Minimum samples split")
                 instantiated_leaf_node = self._create_node(
-                    computed_class_probabilities=self._compute_class_probability(X), 
+                    computed_class_probabilities=self._compute_class_probability(Y), 
                     create_leaf_node=True
                 )
                 return instantiated_leaf_node
