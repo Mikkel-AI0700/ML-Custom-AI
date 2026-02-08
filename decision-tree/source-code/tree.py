@@ -239,8 +239,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         numpy.float32
             Gini impurity.
         """
-        unique_probabilities = self._compute_class_probability(X)
-        computed_impurity = 1 - np.sum(np.square(unique_probabilities))
+        probability_vector = self._compute_class_probability(X)
+        computed_impurity = 1 - np.sum(np.square(probability_vector))
         return computed_impurity
     
     def _compute_entropy (self, X: np.ndarray) -> np.float32:
@@ -339,7 +339,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         else:
             return self._compute_log_loss() # WARNING: Very volatile code. Don't be stupid and run this line ;)
     
-    def _determine_feature_split_metric (self, feature_list: list[int], local_rng: np.random.Generator) -> np.ndarray:
+    def _determine_feature_split_metric (self, feature_list: list[int]) -> np.ndarray:
         """Choose which feature indices to consider for splitting.
 
         Parameters
@@ -359,6 +359,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         The current implementation special-cases the string values ``'sqrt'``
         and ``'log2'``.
         """
+        local_rng = np.random.default_rng(self.random_state)
+
         if feature_list is None:
             return None
 
@@ -679,7 +681,6 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         None
             This estimator is fitted in-place.
         """
-        self._local_rng = np.random.default_rng(self.random_state)
         self._dset_validator.perform_dataset_validation(X)
         self._root_node = self._build_decision_tree(X)
 
