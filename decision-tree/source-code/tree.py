@@ -184,14 +184,14 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         self._dset_validator = DatasetValidation()
         self._param_validator = ParameterValidator()
 
-    def _compute_class_probability (self, X: np.ndarray) -> np.ndarray:
-        """Compute class probabilities for the labels in ``X``.
+    def _compute_class_probability (self, Y: np.ndarray) -> np.ndarray:
+        """Compute class probabilities for the labels in ``Y``.
 
-        The label vector is assumed to be stored in the last column of ``X``.
+        The label vector is assumed to be stored in the last column of ``Y``.
 
         Parameters
         ----------
-        X : numpy.ndarray of shape (n_samples, n_features + 1)
+        Y : numpy.ndarray of shape (n_samples, n_features + 1)
             Training matrix including the ground-truth labels in the last
             column.
 
@@ -205,7 +205,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         This method returns the probabilities in the order produced by
         ``numpy.unique``.
         """
-        labels, label_counts = np.unique(X, return_counts=True)
+        labels, label_counts = np.unique(Y, return_counts=True)
         probability_vector = None
 
         if self._unique_classes is None:
@@ -219,7 +219,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         for label, label_count in zip(labels, label_counts):
             if label in self._classes_to_index.keys():
-                probability_vector[self._classes_to_index.get(label)] = label_count / len(X)
+                probability_vector[self._classes_to_index.get(label)] = label_count / len(Y)
     
     def _compute_impurity (self, X: np.ndarray) -> np.float32:
         """Compute the Gini impurity for a dataset.
@@ -379,7 +379,13 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         return feature_indices
     
-    def _split_yield (self, X: np.ndarray, numeric_features: list[int], categorical_features: list[int]):
+    def _split_yield (
+        self, 
+        X: np.ndarray, 
+        Y: np.ndarray,
+        numeric_features: list[int], 
+        categorical_features: list[int]
+    ):
         """Generate candidate splits for numerical and categorical features.
 
         Parameters
@@ -421,7 +427,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                         X[X[:, cat_feat] != unique_feat]
                     )
 
-    def _split_data (self, X: np.ndarray):
+    def _split_data (self, X: np.ndarray, Y: np.ndarray):
         """Prepare feature subsets and stream candidate splits.
 
         This method acts as a "middleman" between the recursive tree builder
@@ -510,7 +516,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             instantiated_leaf_node._node_is_leaf = True
             return instantiated_leaf_node
 
-    def _build_decision_tree (self, X: np.ndarray, recursive_tree_depth: int = 1):
+    def _build_decision_tree (self, X: np.ndarray, Y: np.ndarray, recursive_tree_depth: int = 1):
         """Recursively build the decision tree.
 
         Parameters
@@ -668,7 +674,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             else:
                 return self._inference_traversal_tree(X, root_node._right_node)
 
-    def fit (self, X: np.ndarray):
+    def fit (self, X: np.ndarray, Y: np.ndarray):
         """Fit the decision tree classifier.
 
         Parameters
@@ -681,8 +687,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         None
             This estimator is fitted in-place.
         """
-        self._dset_validator.perform_dataset_validation(X)
-        self._root_node = self._build_decision_tree(X)
+        self._dset_validator.perform_dataset_validation(X, Y)
+        self._root_node = self._build_decision_tree(X, Y)
 
     def predict (self, X: np.ndarray):
         """Predict class labels for samples in ``X``.
