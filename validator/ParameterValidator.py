@@ -1,5 +1,5 @@
 from typing import Union, Any, Callable
-from inspect import signature, bind
+from inspect import signature
 from errors.ParameterErrors import (
     OutOfBoundsException,
     InvalidSelectionException,
