@@ -90,9 +90,9 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
     configured impurity metric) and grows subtrees until a stopping criterion is
     reached.
 
-    The training API differs slightly from scikit-learn: during ``fit`` this
-    implementation expects the target labels to be present in the last column of
-    the provided training array.
+    The training API follows the scikit-learn convention: during ``fit`` the
+    feature matrix ``X`` and target labels ``Y`` are provided as separate
+    arguments.
 
     Parameters
     ----------
@@ -187,13 +187,10 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
     def _compute_class_probability (self, Y: np.ndarray) -> np.ndarray:
         """Compute class probabilities for the labels in ``Y``.
 
-        The label vector is assumed to be stored in the last column of ``Y``.
-
         Parameters
         ----------
-        Y : numpy.ndarray of shape (n_samples, n_features + 1)
-            Training matrix including the ground-truth labels in the last
-            column.
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector.
 
         Returns
         -------
@@ -222,7 +219,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                 probability_vector[self._classes_to_index.get(label)] = label_count / len(Y)
     
     def _compute_impurity (self, Y: np.ndarray) -> np.float32:
-        """Compute the Gini impurity for a dataset.
+        """Compute the Gini impurity for a set of labels.
 
         Uses the definition:
 
@@ -231,8 +228,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        Y : numpy.ndarray
-            Dataset (or subset) including labels in the last column.
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector (or subset thereof).
 
         Returns
         -------
@@ -244,7 +241,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         return computed_impurity
     
     def _compute_entropy (self, Y: np.ndarray) -> np.float32:
-        """Compute the Shannon entropy for a dataset.
+        """Compute the Shannon entropy for a set of labels.
 
         Uses the definition:
 
@@ -253,8 +250,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        Y : numpy.ndarray
-            Dataset (or subset) including labels in the last column.
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector (or subset thereof).
 
         Returns
         -------
@@ -298,12 +295,12 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        Y : numpy.ndarray
-            Parent dataset (includes labels in the last column).
-        left_subset : numpy.ndarray
-            Left child dataset.
-        right_subset : numpy.ndarray
-            Right child dataset.
+        Y : numpy.ndarray of shape (n_samples,)
+            Parent label vector.
+        left_subset : numpy.ndarray of shape (n_left,)
+            Label vector for the left child subset.
+        right_subset : numpy.ndarray of shape (n_right,)
+            Label vector for the right child subset.
 
         Returns
         -------
@@ -324,8 +321,9 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
-            Dataset (or subset) including labels in the last column.
+        X : numpy.ndarray of shape (n_samples,)
+            Target label vector (or subset thereof) to compute the impurity
+            metric on.
 
         Returns
         -------
@@ -344,14 +342,15 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
-            Input dataset (or feature subset). The last column is assumed to be
-            the label column when ``X`` is the full training matrix.
+        feature_list : list of int or None
+            List of feature indices to subsample from. If ``None``, ``None``
+            is returned immediately.
 
         Returns
         -------
-        numpy.ndarray
-            Selected feature indices.
+        numpy.ndarray or list of int or None
+            Selected feature indices, or ``None`` if ``feature_list`` is
+            ``None``.
 
         Notes
         -----
@@ -390,19 +389,22 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
-            Dataset to split (includes labels in the last column).
-        numeric_features : list of int
+        X : numpy.ndarray of shape (n_samples, n_features)
+            Feature matrix.
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector.
+        numeric_features : list of int or None
             Indices of numerical features to consider.
-        categorical_features : list of int
+        categorical_features : list of int or None
             Indices of categorical features to consider.
 
         Yields
         ------
         tuple
             A tuple of the form
-            ``(feat_type, feat_index, condition, left_subset, right_subset)``.
-            ``feat_type`` is either ``'numerical'`` or ``'categorical'``.
+            ``(feat_type, feat_index, condition, x_left, y_left, x_right,
+            y_right)``.  ``feat_type`` is either ``'numerical'`` or
+            ``'categorical'``.
         """
         if numeric_features is not None:
             for num_feat in numeric_features:
@@ -451,16 +453,17 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
-                Dataset (or subset) to split. During training this includes the
-                labels in the last column.
+        X : numpy.ndarray of shape (n_samples, n_features)
+            Feature matrix (or subset thereof).
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector corresponding to ``X``.
 
         Yields
         ------
         tuple
-                A tuple of the form
-                ``(feat_type, feat_index, condition, left_subset, right_subset)``
-                which is forwarded to ``_build_decision_tree``.
+            A tuple of the form
+            ``(feat_type, feat_index, condition, x_left, y_left, x_right,
+            y_right)`` which is forwarded to ``_build_decision_tree``.
         """
         yield from self._split_yield(
             X,
@@ -530,8 +533,10 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
-            Dataset (or subset) including labels in the last column.
+        X : numpy.ndarray of shape (n_samples, n_features)
+            Feature matrix (or subset thereof).
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector corresponding to ``X``.
         recursive_tree_depth : int, default=1
             Current depth in the recursion.
 
@@ -693,8 +698,10 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray of shape (n_samples, n_features + 1)
-            Training data. The last column must contain the class labels.
+        X : numpy.ndarray of shape (n_samples, n_features)
+            Training feature matrix.
+        Y : numpy.ndarray of shape (n_samples,)
+            Target label vector.
 
         Returns
         -------
