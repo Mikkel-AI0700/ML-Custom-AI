@@ -2,7 +2,7 @@ from typing import Any, Union
 import numpy as np
 import pandas as pd
 from validator.DatasetValidation import DatasetValidation
-from validator import ParameterValidator
+from validator.ParameterValidator import ParameterValidator
 from base.BaseEstimator import BaseEstimator
 from base.ClassifierMixin import ClassifierMixin
 
@@ -179,8 +179,6 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         self._root_node: Union[DecisionNode, LeafNode] = None
         self._unique_classes = None
         self._classes_to_index = {}
-        self._probability_vector = None
-        self._classes_to_index = None
         self._dset_validator = DatasetValidation()
         self._param_validator = ParameterValidator()
 
@@ -217,6 +215,8 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         for label, label_count in zip(labels, label_counts):
             if label in self._classes_to_index.keys():
                 probability_vector[self._classes_to_index.get(label)] = label_count / len(Y)
+
+        return probability_vector
     
     def _compute_impurity (self, Y: np.ndarray) -> np.float32:
         """Compute the Gini impurity for a set of labels.
@@ -738,29 +738,20 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
 def main ():
     # --- Import libraries ---
-    from sklearn.datasets import make_classification
+    from sklearn.datasets import load_breast_cancer
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import accuracy_score, precision_score, recall_score
     from sklearn.tree import DecisionTreeClassifier as SklearnDecisionTreeClassifier
 
-    # --- 1. Generate dataset ---
-    X, y = make_classification(
-        n_samples=1000,
-        n_features=10,
-        n_informative=5,
-        n_redundant=2,
-        n_classes=3,
-        n_clusters_per_class=1,
-        random_state=42
-    )
+    # --- 1. Load breast cancer dataset ---
+    data = load_breast_cancer()
+    X, y = data.data, data.target
+    num_features = list(range(X.shape[1]))
 
     # --- 2. Split dataset into training and testing ---
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
-
-    # Custom tree expects labels in last column during fit
-    train_combined = np.column_stack([X_train, y_train])
 
     # --- 3. Train custom DecisionTreeClassifier ---
     custom_tree = DecisionTreeClassifier(
@@ -768,9 +759,10 @@ def main ():
         max_depth=10,
         min_samples_split=10,
         min_samples_leaf=5,
+        numerical_features=num_features,
         random_state=42
     )
-    custom_tree.fit(train_combined)
+    custom_tree.fit(X_train, y_train)
 
     # --- 4. Get predictions and compute metrics for custom model ---
     custom_predictions = custom_tree.predict(X_test)
