@@ -171,39 +171,6 @@ class DatasetValidation:
             print(dataset_2d_error)
             exit(EXIT_FAILURE)
 
-    def check_datatypes (self, X: np.ndarray, Y: np.ndarray):
-        """Validate dtype compatibility between ``X`` and ``Y``.
-
-        Parameters
-        ----------
-        X : numpy.ndarray
-            Feature dataset.
-        Y : numpy.ndarray
-            Target/label dataset.
-
-        Returns
-        -------
-        bool
-            ``True`` if ``X.dtype == Y.dtype``.
-
-        Raises
-        ------
-        SystemExit
-            Exits with ``EXIT_FAILURE`` after printing ``UnequalDatatypesException``
-            if dtypes differ.
-        """
-        try:
-            if Y is None:
-                return True
-
-            if X.dtype != Y.dtype:
-                raise UnequalDatatypesException(X, Y)
-            else:
-                return True
-        except UnequalDatatypesException as ude_message:
-            print(ude_message.format(ude_message))
-            exit(EXIT_FAILURE)
-
     def infinity_checks (self, X: np.ndarray, Y: Union[np.ndarray | None]):
         """Validate that inputs do not contain infinity values.
 
@@ -319,7 +286,6 @@ class DatasetValidation:
         validation_checks_list = (
             self.check_existence,
             self.check_shapes,
-            self.check_datatypes,
             self.infinity_checks,
             self.nan_checks
         )

@@ -60,31 +60,6 @@ class UnequalShapesException (Exception):
             self.Y.shape[1]
         )
 
-class UnequalDatatypesException (Exception):
-    """Raised when datasets have incompatible dtypes.
-
-    Parameters
-    ----------
-    X : np.ndarray
-        Feature dataset.
-    Y : np.ndarray
-        Target/label dataset.
-
-    Attributes
-    ----------
-    X : np.ndarray
-        Feature dataset.
-    Y : np.ndarray
-        Target/label dataset.
-    """
-    def __init__ (self, X: np.ndarray, Y: np.ndarray):
-        self.X = X
-        self.Y = Y
-        self.ude_message = "[-] Error: Unequal dtypes. X dtype: {} | Y dtype: {}"
-
-    def __str__ (self):
-        return self.ude_message.format(self.X.dtype, self.Y.dtype)
-    
 class Not1DDataset (Exception):
     """Raised when an input dataset is not 1-dimensional.
 
