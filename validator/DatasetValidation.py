@@ -6,7 +6,6 @@ from errors.DatasetErrors import (
     Not1DDataset,
     Not2DDataset,
     UnequalShapesException,
-    UnequalDatatypesException,
     InfinityException,
     NaNException
 )
