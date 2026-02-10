@@ -290,7 +290,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         log_loss = 1 / len(Y_probabilities) * np.sum(log_loss_eq)
         return log_loss
     
-    def _compute_information_gain (self, X: np.ndarray, left_subset: np.ndarray, right_subset: np.ndarray):
+    def _compute_information_gain (self, Y: np.ndarray, left_subset: np.ndarray, right_subset: np.ndarray):
         """Compute information gain for a candidate split.
 
         Information gain is computed as the impurity of the parent node minus the
@@ -298,7 +298,7 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : numpy.ndarray
+        Y : numpy.ndarray
             Parent dataset (includes labels in the last column).
         left_subset : numpy.ndarray
             Left child dataset.
@@ -310,12 +310,12 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         numpy.float32
             Information gain.
         """
-        main_data_impurity = self._determine_impurity_metric(X)
+        main_data_impurity = self._determine_impurity_metric(Y)
         left_subset_impurity = self._determine_impurity_metric(left_subset)
         right_subset_impurity = self._determine_impurity_metric(right_subset)
 
-        left_subset_weighted = len(left_subset) / len(X) * left_subset_impurity
-        right_subset_weighted = len(right_subset) / len(X) * right_subset_impurity
+        left_subset_weighted = len(left_subset) / len(Y) * left_subset_impurity
+        right_subset_weighted = len(right_subset) / len(Y) * right_subset_impurity
         
         return main_data_impurity - (left_subset_weighted + right_subset_weighted)
     
@@ -409,22 +409,30 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                 unique_values = np.unique(X[:, num_feat])
                 computed_midpoint_thresholds = (unique_values[:-1] + unique_values[1:]) / 2
                 for threshold in computed_midpoint_thresholds:
+                    x_greater_condition = X[:, num_feat] > threshold
+                    x_less_condition = X[:, num_feat] <= threshold
                     yield (
                         "numerical",
                         num_feat,
                         threshold,
-                        X[X[:, num_feat] > threshold],
-                        X[X[:, num_feat] <= threshold]
+                        X[x_greater_condition],
+                        Y[x_greater_condition],
+                        X[x_less_condition],
+                        Y[x_less_condition]
                     )
         if categorical_features is not None:
             for cat_feat in categorical_features:
                 for unique_feat in np.unique(X[:, cat_feat]):
+                    x_equal_condition = X[:, cat_feat] == unique_feat
+                    x_unequal_condition = X[:, cat_feat] != unique_feat
                     yield (
                         "categorical",
                         cat_feat,
                         unique_feat,
-                        X[X[:, cat_feat] == unique_feat],
-                        X[X[:, cat_feat] != unique_feat]
+                        X[x_equal_condition],
+                        Y[x_equal_condition],
+                        X[x_unequal_condition],
+                        Y[x_unequal_condition]
                     )
 
     def _split_data (self, X: np.ndarray, Y: np.ndarray):
@@ -536,8 +544,10 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         best_index = None
         best_num_split_condition = None
         best_unique_split_condition = None
-        best_computed_left_split: np.ndarray = None
-        best_computed_right_split: np.ndarray = None
+        best_computed_x_true: np.ndarray = None
+        best_computed_y_true: np.ndarray = None
+        best_computed_x_false: np.ndarray = None
+        best_computed_y_false: np.ndarray = None
 
         # Tree depth & min_samples_split hyperparameter check
         if recursive_tree_depth == self.max_depth:
@@ -556,36 +566,35 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             )
             return leaf_node
 
-        for feat_type, feat_index, condition, group_above_condition, group_below_condition in self._split_data(X, Y):
+        for feat_type, feat_index, condition, x_true, y_true, x_false, y_false in self._split_data(X, Y):
+            current_iteration_information_gain = self._compute_information_gain(
+                Y,
+                y_true,
+                y_false
+            )
+
             if feat_type == "numerical":
-                num_feat_information_gain = self._compute_information_gain(
-                    X, 
-                    group_above_condition, 
-                    group_below_condition
-                )
-                if num_feat_information_gain > best_computed_information_gain:
+                if current_iteration_information_gain > best_computed_information_gain:
                     best_index = feat_index
-                    best_computed_information_gain = num_feat_information_gain
+                    best_computed_information_gain = current_iteration_information_gain
                     best_num_split_condition = condition
-                    best_computed_left_split = group_above_condition
-                    best_computed_right_split = group_below_condition
+                    best_computed_x_true = x_true
+                    best_computed_y_true = y_true
+                    best_computed_x_false = x_false
+                    best_computed_y_false = y_false
                     best_unique_split_condition = None
                 else:
                     continue
 
             if feat_type == "categorical":
-                cat_feat_information_gain = self._compute_information_gain(
-                    X, 
-                    group_above_condition, 
-                    group_below_condition
-                )
-
-                if cat_feat_information_gain > best_computed_information_gain:
+                if current_iteration_information_gain > best_computed_information_gain:
                     best_index = feat_index
-                    best_computed_information_gain = cat_feat_information_gain
+                    best_computed_information_gain = current_iteration_information_gain
                     best_unique_split_condition = condition
-                    best_computed_left_split = group_above_condition
-                    best_computed_right_split = group_below_condition
+                    best_computed_x_true = x_true
+                    best_computed_y_true = y_true
+                    best_computed_x_false = x_false
+                    best_computed_y_false = y_false
                     best_num_split_condition = None
                 else:
                     continue
@@ -594,8 +603,10 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
                 Information
                     Best index: {best_index}
                     Best computed information gain: {best_computed_information_gain}
-                    Best computed left subset: {best_computed_left_split}
-                    Best computed right subset: {best_computed_right_split}
+                    Best computed X true: {best_computed_x_true.shape}
+                    Best computed Y true: {best_computed_y_true.shape}
+                    Best computed X false: {best_computed_x_false.shape}
+                    Best computed Y false: {best_computed_y_false.shape}
 
                 Conditions
                     Best numerical condition: {best_num_split_condition}
@@ -612,11 +623,11 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
             return instantiated_leaf_node
 
         # min_samples_leaf hyperparameter check
-        if (best_computed_left_split is not None and
-            best_computed_right_split is not None
+        if (best_computed_y_true is not None and
+            best_computed_y_false is not None
         ):
-            if (best_computed_left_split.shape[0] < self.min_samples_leaf or
-                best_computed_right_split.shape[0] < self.min_samples_leaf
+            if (best_computed_y_true.shape[0] < self.min_samples_leaf or
+                best_computed_y_false.shape[0] < self.min_samples_leaf
             ):
                 print(f"[*] Stopping training, condition hit: Minimum samples split")
                 instantiated_leaf_node = self._create_node(
@@ -634,11 +645,13 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         )
 
         instantiated_decision_node._left_node = self._build_decision_tree(
-            best_computed_left_split, 
+            best_computed_x_true,
+            best_computed_y_true,
             recursive_tree_depth + 1
         )
         instantiated_decision_node._right_node = self._build_decision_tree(
-            best_computed_right_split, 
+            best_computed_x_false,
+            best_computed_y_false,
             recursive_tree_depth + 1
         )
 
