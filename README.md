@@ -1,11 +1,11 @@
-# 🧠 ML-Custom-AI
+# ML-Custom-AI
 
 **ML-Custom-AI** is a Python project that aims to recreate the core concepts and functionalities of **Scikit-Learn**, including its machine learning algorithms, preprocessing utilities, model selection mechanisms, metrics, and transformers.  
 Rather than cloning Scikit-Learn directly, this project reimplements these ideas using a different approach — to better understand *how* and *why* these components work under the hood.
 
 ---
 
-## 🚀 Project Overview
+## Project Overview
 
 The **goal** of this project is to:
 - Deepen my understanding of how machine learning algorithms and libraries function internally.
@@ -16,7 +16,7 @@ This project serves as a **personal exploration** of building a modular, extensi
 
 ---
 
-## 🧩 Features (In Progress)
+## Features (In Progress)
 
 The project will include implementations of:
 - **Supervised Learning Algorithms**
@@ -36,11 +36,11 @@ The project will include implementations of:
 - **Transformers**
   - Custom pipeline-compatible data transformers
 
-> ⚙️ Each module is designed to be reusable and flexible, making experimentation and debugging easier while keeping the structure close to modern ML library design.
+> Each module is designed to be reusable and flexible, making experimentation and debugging easier while keeping the structure close to modern ML library design.
 
 ---
 
-## 📚 Learning Objectives
+## Learning Objectives
 
 This project is not meant to compete with Scikit-Learn — it’s meant to:
 1. Build a **deeper conceptual understanding** of machine learning internals.
@@ -50,7 +50,7 @@ This project is not meant to compete with Scikit-Learn — it’s meant to:
 
 ---
 
-## 🧠 Related Project
+## Related Project
 
 This repository has a **C++ counterpart**:
 
@@ -59,7 +59,7 @@ This repository has a **C++ counterpart**:
 
 ---
 
-## 🧩 Project Status
+## Project Status
 
 **Status:** 🛠️ *Under Active Development*  
 Updates, bug fixes, and new features are added gradually.  
@@ -67,14 +67,14 @@ Delays in commits or remote pushes may occur since this project is developed alo
 
 ---
 
-## 🪪 License
+## License
 
 This project is open-source and available under the **MIT License**.  
 Feel free to explore, learn from, and contribute!
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome!  
 If you’d like to add algorithms, fix bugs, or improve documentation:
@@ -84,7 +84,25 @@ If you’d like to add algorithms, fix bugs, or improve documentation:
 
 ---
 
-## 📬 Contact
+## Disclaimer:
+
+I am choosing to disclose that I have used Artificial Intelligence in making of this project, however, the uses are stricly
+limited to the following:
+
+1. Generation of Numpy-style documentation
+2. Clarification of library function uses and the conceptual understanding of the code that I wrote
+3. Assistance in debugging and tracing errors
+4. Generating the model's code for testing and benchmarking
+
+The said use cases are only limited to what is said above. <br>
+Rest assured that all of the AI's responses, especially generated code, were heavily reviewed <br>
+before being approved.
+
+Lastly, the core decisions and implementations of the machine learning models were and still are written by me to make sure I still understand the core logic of the machine learning models.
+
+---
+
+## Contact
 
 **Author:** Mikkel  
 **Role:** Student Programmer & ML Engineer in Training  
