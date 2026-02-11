@@ -15,18 +15,35 @@ from sklearn.model_selection import train_test_split
 class LogisticRegression:
     """Binary logistic regression trained with (batch) gradient descent.
 
-    The model computes linear scores `z = Xw + b`, converts them to probabilities
-    via the sigmoid function, and (in `predict`) thresholds probabilities at 0.5
-    to produce class labels in {0, 1}.
+    The model computes linear scores ``z = Xw + b``, converts them to
+    probabilities via the sigmoid function, and (in ``predict``) thresholds
+    probabilities at 0.5 to produce class labels in {0, 1}.
 
-    Attributes:
-        partial_derivative_m (np.ndarray | None): Weight vector (initialized in `fit`).
-        partial_derivative_b (float | None): Bias term (initialized in `fit` if `fit_intercept=True`).
-        epochs (int): Number of training iterations.
-        learning_rate (int | float): Step size for gradient updates.
-        fit_intercept (bool): Whether to learn an intercept/bias term.
-        _dset_validator (DatasetValidation): Dataset validation helper.
-        _hyperparameter_validator (ParameterValidator): Hyperparameter validation helper.
+    Parameters
+    ----------
+    epochs : int
+        Number of training iterations (complete passes over the dataset).
+    learning_rate : int or float
+        Step size for gradient updates.
+    fit_intercept : bool, default=True
+        Whether to learn an intercept/bias term.
+
+    Attributes
+    ----------
+    partial_derivative_m : np.ndarray or None
+        Weight vector of shape (n_features,). Initialized in ``fit``.
+    partial_derivative_b : float or None
+        Bias term. Initialized in ``fit`` if ``fit_intercept=True``.
+    epochs : int
+        Number of training iterations.
+    learning_rate : int or float
+        Step size for gradient updates.
+    fit_intercept : bool
+        Whether to learn an intercept/bias term.
+    _dset_validator : DatasetValidation
+        Dataset validation helper.
+    _hyperparameter_validator : ParameterValidator
+        Hyperparameter validation helper.
     """
     __parameter_constraints__ = {
         "epochs": (int),
@@ -39,18 +56,20 @@ class LogisticRegression:
         self.partial_derivative_b = None
         self.epochs = epochs
         self.learning_rate = learning_rate
-        self.fit_intercept = True
+        self.fit_intercept = fit_intercept
         self._dset_validator = DatasetValidation()
         self._hyperparameter_validator = ParameterValidator()
 
     def _initialize_weights_bias(self, train_x: np.ndarray):
         """Initialize model parameters.
 
-        Args:
-            train_x (np.ndarray): Training feature matrix of shape (n_samples, n_features).
+        Sets the weight vector to zeros and, if ``fit_intercept`` is True,
+        sets the bias to 0.0.
 
-        Returns:
-            None
+        Parameters
+        ----------
+        train_x : np.ndarray of shape (n_samples, n_features)
+            Training feature matrix used to determine the number of weights.
         """
         self.partial_derivative_m = np.zeros((train_x.shape[1]))
 
@@ -63,28 +82,42 @@ class LogisticRegression:
         Uses the batch gradient:
         `dw = (1 / m) * X^T (y_pred - y)`.
 
-        Args:
-            train_x (np.ndarray): Feature matrix of shape (m, n_features).
-            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
-            pred_y (np.ndarray): Predicted probabilities of shape compatible with `train_y`.
+        Parameters
+        ----------
+        train_x : np.ndarray of shape (m, n_features)
+            Feature matrix.
+        train_y : np.ndarray of shape (m,) or (m, 1)
+            True binary target values.
+        pred_y : np.ndarray of shape (m,) or (m, 1)
+            Predicted probabilities, same shape as `train_y`.
 
-        Returns:
-            np.ndarray: Weight gradients of shape (n_features,).
+        Returns
+        -------
+        np.ndarray of shape (n_features,)
+            Weight gradients.
         """
         return 1 / len(train_x) * np.dot(train_x.T, (pred_y - train_y))
 
     def _compute_bias_gradients(self, train_y: np.ndarray, pred_y: np.ndarray):
         """Compute gradient for the bias term.
 
-        Uses:
-        `db = (1 / m) * sum(y_pred - y)`.
+        Uses the batch gradient:
 
-        Args:
-            train_y (np.ndarray): Targets of shape (m,) or (m, 1).
-            pred_y (np.ndarray): Predicted probabilities of shape compatible with `train_y`.
+        .. math::
 
-        Returns:
-            float: Bias gradient.
+            db = \\frac{1}{m} \\sum (\\hat{y} - y)
+
+        Parameters
+        ----------
+        train_y : np.ndarray of shape (m,) or (m, 1)
+            True binary target values.
+        pred_y : np.ndarray of shape (m,) or (m, 1)
+            Predicted probabilities, same shape as `train_y`.
+
+        Returns
+        -------
+        float
+            Bias gradient scalar.
         """
         return 1 / len(train_y) * np.sum(pred_y - train_y)
 
@@ -94,11 +127,10 @@ class LogisticRegression:
         Update rule:
         `w = w - learning_rate * dw`.
 
-        Args:
-            computed_weights_gradients (np.ndarray): Weight gradients (dw).
-
-        Returns:
-            None
+        Parameters
+        ----------
+        computed_weights_gradients : np.ndarray of shape (n_features,)
+            Weight gradients (dw).
         """
         self.partial_derivative_m -= self.learning_rate * computed_weights_gradients
 
@@ -108,11 +140,10 @@ class LogisticRegression:
         Update rule:
         `b = b - learning_rate * db`.
 
-        Args:
-            computed_bias_gradient (float): Bias gradient (db).
-
-        Returns:
-            None
+        Parameters
+        ----------
+        computed_bias_gradient : float
+            Bias gradient (db).
         """
         self.partial_derivative_b -= self.learning_rate * computed_bias_gradient
 
@@ -121,11 +152,15 @@ class LogisticRegression:
 
         Computes: `sigma(z) = 1 / (1 + exp(-z))`.
 
-        Args:
-            predictions (np.ndarray): Raw linear scores/logits.
+        Parameters
+        ----------
+        predictions : np.ndarray
+            Raw linear scores (logits).
 
-        Returns:
-            np.ndarray: Probabilities in the range (0, 1).
+        Returns
+        -------
+        np.ndarray
+            Probabilities in the range (0, 1).
         """
         return 1 / (1 + np.exp(-predictions))
 
@@ -136,12 +171,20 @@ class LogisticRegression:
     ):
         """Train the model on the provided dataset.
 
-        Args:
-            train_x (np.ndarray | pd.DataFrame): Training features of shape (n_samples, n_features).
-            train_y (np.ndarray | pd.DataFrame): Binary targets of shape (n_samples,) or (n_samples, 1).
+        Performs batch gradient descent for ``epochs`` iterations. At each
+        epoch the method computes the sigmoid predictions
+        ``z = Xw + b``, derives the weight and bias gradients, and updates
+        the parameters in-place.
 
-        Returns:
-            None
+        If the inputs are ``pd.DataFrame`` objects they are converted to
+        NumPy arrays before training.
+
+        Parameters
+        ----------
+        train_x : np.ndarray or pd.DataFrame of shape (n_samples, n_features)
+            Training feature matrix.
+        train_y : np.ndarray or pd.DataFrame of shape (n_samples,) or (n_samples, 1)
+            Binary target values.
         """
         if isinstance(train_x, pd.DataFrame):
             train_x = train_x.to_numpy()
@@ -151,7 +194,6 @@ class LogisticRegression:
             print(f"[+] Train y is Pandas, Converted to Numpy -> Rows: {train_y.shape[0]} | Columns: {train_y.shape[1]}")
 
         self._dset_validator.perform_dataset_validation(train_x, train_y)
-        self._hyperparameter_validator.validate_parameters()
         self._initialize_weights_bias(train_x)
 
         for epoch in range(self.epochs):
@@ -169,13 +211,22 @@ class LogisticRegression:
     def predict(self, test_x: Union[np.ndarray | pd.DataFrame]):
         """Predict class labels for the given samples.
 
-        Produces probabilities with sigmoid and thresholds at 0.5.
+        Computes raw logits ``z = Xw + b``, passes them through the sigmoid
+        function, and thresholds the resulting probabilities at 0.5 to
+        produce class labels in {0, 1}.
 
-        Args:
-            test_x (np.ndarray | pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        If the input is a ``pd.DataFrame`` it is converted to a NumPy array
+        before prediction.
 
-        Returns:
-            np.ndarray: Predicted class labels (0 or 1).
+        Parameters
+        ----------
+        test_x : np.ndarray or pd.DataFrame of shape (n_samples, n_features)
+            Feature matrix for which to generate predictions.
+
+        Returns
+        -------
+        np.ndarray of shape (n_samples,)
+            Predicted class labels (0 or 1).
         """
         if isinstance(test_x, pd.DataFrame):
             test_x = test_x.to_numpy()

@@ -737,64 +737,119 @@ class DecisionTreeClassifier (BaseEstimator, ClassifierMixin):
         return np.asarray(inferenced_elements_array)
 
 def main ():
-    # --- Import libraries ---
+    run_benchmark(
+        n_runs=10,
+        test_size=0.2,
+        base_random_state=42,
+        suppress_training_logs=True,
+    )
+
+
+def run_benchmark(
+    n_runs: int = 10,
+    test_size: float = 0.2,
+    base_random_state: int = 42,
+    suppress_training_logs: bool = True,
+):
+    """Benchmark custom vs scikit-learn DecisionTreeClassifier.
+
+    This function does NOT modify the custom tree implementation; it only runs
+    multiple train/test splits and reports mean/std metrics to reduce the risk
+    of over-interpreting a single split.
+    """
+    import io
+    import contextlib
     from sklearn.datasets import load_breast_cancer
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import accuracy_score, precision_score, recall_score
     from sklearn.tree import DecisionTreeClassifier as SklearnDecisionTreeClassifier
 
-    # --- 1. Load breast cancer dataset ---
     data = load_breast_cancer()
     X, y = data.data, data.target
     num_features = list(range(X.shape[1]))
 
-    # --- 2. Split dataset into training and testing ---
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    custom_metrics = []
+    sklearn_metrics = []
 
-    # --- 3. Train custom DecisionTreeClassifier ---
-    custom_tree = DecisionTreeClassifier(
-        split_metric="gini",
-        max_depth=10,
-        min_samples_split=10,
-        min_samples_leaf=5,
-        numerical_features=num_features,
-        random_state=42
-    )
-    custom_tree.fit(X_train, y_train)
+    for run_idx in range(n_runs):
+        split_seed = base_random_state + run_idx
 
-    # --- 4. Get predictions and compute metrics for custom model ---
-    custom_predictions = custom_tree.predict(X_test)
-    custom_accuracy = accuracy_score(y_test, custom_predictions)
-    custom_precision = precision_score(y_test, custom_predictions, average="macro", zero_division=0)
-    custom_recall = recall_score(y_test, custom_predictions, average="macro", zero_division=0)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=split_seed, stratify=y
+        )
 
-    # --- 5. Train sklearn DecisionTreeClassifier and compute metrics ---
-    sklearn_tree = SklearnDecisionTreeClassifier(
-        criterion="gini",
-        max_depth=10,
-        min_samples_split=10,
-        min_samples_leaf=5,
-        random_state=42
-    )
-    sklearn_tree.fit(X_train, y_train)
+        custom_tree = DecisionTreeClassifier(
+            split_metric="gini",
+            max_depth=10,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            numerical_features=num_features,
+            random_state=base_random_state,
+        )
 
-    sklearn_predictions = sklearn_tree.predict(X_test)
-    sklearn_accuracy = accuracy_score(y_test, sklearn_predictions)
-    sklearn_precision = precision_score(y_test, sklearn_predictions, average="macro", zero_division=0)
-    sklearn_recall = recall_score(y_test, sklearn_predictions, average="macro", zero_division=0)
+        if suppress_training_logs:
+            with contextlib.redirect_stdout(io.StringIO()):
+                custom_tree.fit(X_train, y_train)
+        else:
+            custom_tree.fit(X_train, y_train)
 
-    # --- Side-by-side comparison ---
-    print("\n" + "=" * 60)
-    print("DECISION TREE CLASSIFIER - METRICS COMPARISON")
-    print("=" * 60)
-    print(f"{'Metric':<15} {'Custom Model':<20} {'Sklearn Model':<20}")
-    print("-" * 60)
-    print(f"{'Accuracy':<15} {custom_accuracy:<20.4f} {sklearn_accuracy:<20.4f}")
-    print(f"{'Precision':<15} {custom_precision:<20.4f} {sklearn_precision:<20.4f}")
-    print(f"{'Recall':<15} {custom_recall:<20.4f} {sklearn_recall:<20.4f}")
-    print("=" * 60)
+        custom_pred = custom_tree.predict(X_test)
+        custom_metrics.append(
+            (
+                accuracy_score(y_test, custom_pred),
+                precision_score(y_test, custom_pred, average="macro", zero_division=0),
+                recall_score(y_test, custom_pred, average="macro", zero_division=0),
+            )
+        )
+
+        sklearn_tree = SklearnDecisionTreeClassifier(
+            criterion="gini",
+            max_depth=10,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            random_state=base_random_state,
+        )
+        sklearn_tree.fit(X_train, y_train)
+
+        sklearn_pred = sklearn_tree.predict(X_test)
+        sklearn_metrics.append(
+            (
+                accuracy_score(y_test, sklearn_pred),
+                precision_score(y_test, sklearn_pred, average="macro", zero_division=0),
+                recall_score(y_test, sklearn_pred, average="macro", zero_division=0),
+            )
+        )
+
+    custom_arr = np.asarray(custom_metrics, dtype=float)
+    sklearn_arr = np.asarray(sklearn_metrics, dtype=float)
+    diff_arr = custom_arr - sklearn_arr
+
+    def _mean_std(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return a.mean(axis=0), a.std(axis=0, ddof=1) if a.shape[0] > 1 else (a.mean(axis=0), np.zeros(3))
+
+    custom_mean, custom_std = _mean_std(custom_arr)
+    sklearn_mean, sklearn_std = _mean_std(sklearn_arr)
+    diff_mean, diff_std = _mean_std(diff_arr)
+
+    print("\n" + "=" * 68)
+    print("DECISION TREE CLASSIFIER - BENCHMARK (CUSTOM vs SKLEARN)")
+    print("=" * 68)
+    print(f"Runs: {n_runs} | test_size: {test_size} | split_seed: {base_random_state}..{base_random_state + n_runs - 1}")
+    print("(Metrics shown as mean ± std across runs)")
+    print("-" * 68)
+    print(f"{'Metric':<12} {'Custom':<22} {'Sklearn':<22} {'Custom-Sklearn':<0}")
+    print("-" * 68)
+
+    metric_names = ["Accuracy", "Precision", "Recall"]
+    for idx, name in enumerate(metric_names):
+        print(
+            f"{name:<12} "
+            f"{custom_mean[idx]:.4f} ± {custom_std[idx]:.4f}       "
+            f"{sklearn_mean[idx]:.4f} ± {sklearn_std[idx]:.4f}       "
+            f"{diff_mean[idx]:+.4f} ± {diff_std[idx]:.4f}"
+        )
+
+    print("=" * 68)
 
 
 if __name__ == "__main__":
